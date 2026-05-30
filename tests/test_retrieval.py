@@ -87,3 +87,17 @@ def test_factory_rejects_unknown_retriever(tmp_path):
     cfg = replace(Config(data_dir=tmp_path), retriever="bogus")
     with pytest.raises(ValueError, match="Unknown retriever"):
         build_retriever(cfg)
+
+
+def test_get_includes_source_url(tmp_path):
+    r = _retriever(tmp_path)
+    detail = r.get("Frightened", category="condition")
+    assert detail is not None
+    assert detail.source_url == "https://2e.aonprd.com/Search.aspx?q=Frightened"
+
+
+def test_search_hits_include_source_url(tmp_path):
+    r = _retriever(tmp_path)
+    hits = r.search("status penalty", category="condition", limit=5)
+    hit = next(h for h in hits if h.name == "Frightened")
+    assert hit.source_url == "https://2e.aonprd.com/Search.aspx?q=Frightened"
