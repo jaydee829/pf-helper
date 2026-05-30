@@ -62,3 +62,27 @@ def test_excerpt_truncates_long_text():
 
 
 _EXCERPT_LEN_PLUS = 243  # 240 chars + "..."
+
+
+def test_factory_builds_fts5_retriever(tmp_path):
+    from pf_helper.config import Config
+    from pf_helper.retrieval.factory import build_retriever
+    from pf_helper.retrieval.fts5 import Fts5Retriever
+
+    cfg = Config(data_dir=tmp_path)
+    build_index(cfg, packs_root=FIXTURE_PACKS)
+    r = build_retriever(cfg)
+    assert isinstance(r, Fts5Retriever)
+
+
+def test_factory_rejects_unknown_retriever(tmp_path):
+    from dataclasses import replace
+
+    import pytest
+
+    from pf_helper.config import Config
+    from pf_helper.retrieval.factory import build_retriever
+
+    cfg = replace(Config(data_dir=tmp_path), retriever="bogus")
+    with pytest.raises(ValueError, match="Unknown retriever"):
+        build_retriever(cfg)
