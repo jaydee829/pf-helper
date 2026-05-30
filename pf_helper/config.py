@@ -14,10 +14,15 @@ class Config:
     data_dir: Path = _DEFAULT_DATA
     foundry_repo_url: str = "https://github.com/foundryvtt/pf2e"
     retriever: str = "fts5"
+    aon_es_url: str = "https://elasticsearch.aonprd.com/aon/_search"
 
     @property
     def db_path(self) -> Path:
         return self.data_dir / "pf2e.db"
+
+    @property
+    def aon_dir(self) -> Path:
+        return self.data_dir / "aon"
 
     @property
     def foundry_dir(self) -> Path:

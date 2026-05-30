@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pf_helper.ingest.sources import FoundrySource
+from pf_helper.ingest.sources import AonSource, FoundrySource
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "foundry"
 
@@ -50,3 +50,27 @@ def test_foundry_entry_has_aon_search_url():
     src = FoundrySource(FIXTURE_ROOT)
     feat = next(e for e in src.iter_entries() if e.name == "Test Feat")
     assert feat.source_url == "https://2e.aonprd.com/Search.aspx?q=Test+Feat"
+
+
+AON_FIXTURE_DIR = Path(__file__).parent / "fixtures" / "aon"
+
+
+def test_aon_source_maps_fields_and_cleans_text():
+    src = AonSource(AON_FIXTURE_DIR)
+    by_name = {e.name: e for e in src.iter_entries()}
+    trait = by_name["Aberration"]
+    assert trait.category == "trait"
+    assert trait.id == "trait:aberration-trait-1"
+    assert trait.source_book == "Core Rulebook"
+    assert trait.source_url == "https://2e.aonprd.com/Traits.aspx?ID=1"
+    assert "Aberrations are creatures from beyond the planes." in trait.text
+    assert "<title" not in trait.text and "[Aberration]" not in trait.text
+
+
+def test_aon_source_maps_traits_and_level():
+    src = AonSource(AON_FIXTURE_DIR)
+    ritual = next(e for e in src.iter_entries() if e.name == "Animate Object")
+    assert ritual.category == "ritual"
+    assert ritual.level == 2
+    assert ritual.traits == ("Transmutation", "Uncommon")
+    assert ritual.source_url == "https://2e.aonprd.com/Rituals.aspx?ID=1"

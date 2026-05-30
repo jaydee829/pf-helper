@@ -9,6 +9,7 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from urllib.parse import quote_plus
 
+from pf_helper.ingest.aon_clean import clean_aon
 from pf_helper.ingest.clean import clean_text
 from pf_helper.ingest.extract import extract_stats
 from pf_helper.models import Entry
@@ -37,6 +38,36 @@ CATEGORY_MAP: dict[str, str] = {
     "ammo": "equipment",
     "kit": "equipment",
 }
+
+# AON Elasticsearch categories to ingest (those the Foundry compendium lacks).
+# Adding one here (plus a matching Category enum value) is all that's needed.
+# Note: AON "heritage" is its own category here, whereas FoundrySource maps
+# Foundry's heritage docs to "ancestry" -- so heritages can appear under both.
+AON_CATEGORIES: tuple[str, ...] = (
+    "trait",
+    "skill",
+    "archetype",
+    "rules",
+    "class-feature",
+    "heritage",
+    "bloodline",
+    "mystery",
+    "patron",
+    "lesson",
+    "arcane-school",
+    "domain",
+    "implement",
+    "ikon",
+    "animal-companion",
+    "familiar-ability",
+    "ritual",
+    "relic",
+    "curse",
+    "disease",
+    "language",
+    "plane",
+    "vehicle",
+)
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 
@@ -97,6 +128,59 @@ class FoundrySource(Source):
             raw_json=json.dumps(doc, separators=(",", ":")),
             stats=extract_stats(category, system),
             source_url=f"https://2e.aonprd.com/Search.aspx?q={quote_plus(doc['name'])}",
+        )
+
+
+class AonSource(Source):
+    """Yields Entries from locally-cached AON Elasticsearch JSON.
+
+    Reads `<aon_dir>/<category>.json` (a JSON array of AON `_source` objects)
+    for each category in AON_CATEGORIES. Missing files are skipped.
+    """
+
+    def __init__(self, aon_dir: str | Path):
+        self.aon_dir = Path(aon_dir)
+
+    def iter_entries(self) -> Iterator[Entry]:
+        for category in AON_CATEGORIES:
+            path = self.aon_dir / f"{category}.json"
+            if not path.exists():
+                continue
+            try:
+                docs = json.loads(path.read_text(encoding="utf-8"))
+            except OSError:
+                continue
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(docs, list):
+                continue
+            for doc in docs:
+                entry = self._to_entry(doc)
+                if entry is not None:
+                    yield entry
+
+    def _to_entry(self, doc: dict) -> Entry | None:
+        if not isinstance(doc, dict):
+            return None
+        name = doc.get("name")
+        category = doc.get("category")
+        aon_id = doc.get("id")
+        if not name or not category or not aon_id:
+            return None
+        traits = doc.get("trait")
+        level = doc.get("level")
+        url = doc.get("url") or ""
+        return Entry(
+            id=f"{category}:{_slug(name)}-{aon_id}",
+            name=name,
+            category=category,
+            traits=tuple(traits) if isinstance(traits, list) else (),
+            level=level if isinstance(level, int) else None,
+            source_book=doc.get("primary_source"),
+            text=clean_aon(doc.get("markdown") or ""),
+            raw_json=json.dumps(doc, separators=(",", ":")),
+            source_url=f"https://2e.aonprd.com{url}" if url else "",
+            # AON gap categories are narrative; no structured statblock (stats=()).
         )
 
 

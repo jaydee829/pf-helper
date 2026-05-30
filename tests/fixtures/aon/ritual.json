@@ -1,0 +1,13 @@
+[
+  {
+    "id": "ritual-1",
+    "name": "Animate Object",
+    "category": "ritual",
+    "type": "Ritual",
+    "trait": ["Transmutation", "Uncommon"],
+    "primary_source": "Core Rulebook",
+    "level": 2,
+    "url": "/Rituals.aspx?ID=1",
+    "markdown": "<title level=\"1\" right=\"Ritual 2\">[Animate Object](/Rituals.aspx?ID=1)</title>\n\n<traits>\n<trait label=\"Uncommon\" url=\"/Traits.aspx?ID=159\" />\n<trait label=\"Transmutation\" url=\"/Traits.aspx?ID=155\" /></traits>\n\nYou transform the target into an animated object."
+  }
+]
