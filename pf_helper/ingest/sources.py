@@ -75,7 +75,7 @@ class FoundrySource(Source):
             return None  # skip top-level JSON arrays (not Foundry documents)
         doc_type = doc.get("type")
         category = CATEGORY_MAP.get(doc_type)
-        if category is None or "name" not in doc:
+        if category is None or "name" not in doc or "_id" not in doc:
             return None
         system = doc.get("system", {})
         html = (system.get("description") or {}).get("value", "")

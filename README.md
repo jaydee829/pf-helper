@@ -37,7 +37,8 @@ Edit `claude_desktop_config.json`
   }
 }
 ```
-Restart Claude Desktop. The `pf-helper` tools should appear.
+Set `cwd` to wherever you cloned this repo (the example uses this project's
+path). Restart Claude Desktop; the `pf-helper` tools should appear.
 
 ## Register with Claude Code
 ```bash
@@ -68,4 +69,3 @@ Re-run `uv run pf-helper-ingest` to pull the latest Foundry data and rebuild.
   `Retriever` interface (`pf_helper/retrieval/`) serves it; `pf_helper/server.py`
   exposes `search` and `get_entry` as MCP tools. See
   `docs/superpowers/specs/` for the full design.
-```

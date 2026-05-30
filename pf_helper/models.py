@@ -62,7 +62,7 @@ class EntryDetail(BaseModel):
     traits: list[str] = Field(default_factory=list)
     source_book: str | None = None
     # Flattened from Entry.stats (a tuple of pairs) to a dict for the response;
-    # ordering is not preserved.
+    # insertion order is preserved (dict + json both keep order).
     stats: dict[str, str] = Field(
         default_factory=dict,
         description="Category-aware header fields (e.g. creature AC/HP/saves, spell range/area)",
