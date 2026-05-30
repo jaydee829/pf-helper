@@ -59,8 +59,18 @@ directory, but Claude Desktop does not reliably apply the `cwd` field to the
 spawned process — so `uv` fails with
 `Failed to spawn: pf-helper: program not found`. The direct venv executable has
 no such dependency. If you prefer `uv` (e.g. to auto-sync dependencies), make it
-cwd-independent with `--directory`:
-`"command": "uv"`, `"args": ["run", "--directory", "C:\\path\\to\\PF_Helper", "pf-helper"]`.
+cwd-independent by passing the global `--directory` option before the `run`
+subcommand:
+```json
+{
+  "mcpServers": {
+    "pf-helper": {
+      "command": "uv",
+      "args": ["--directory", "C:\\path\\to\\PF_Helper", "run", "pf-helper"]
+    }
+  }
+}
+```
 
 ## Register with Claude Code
 ```bash
@@ -81,7 +91,7 @@ Re-run `uv run pf-helper-ingest` to pull the latest Foundry data and rebuild.
 - **`Failed to spawn: pf-helper: program not found` in the MCP log:** the server
   was launched via `uv run` without the project as its working directory. Use
   the direct `.venv\Scripts\pf-helper.exe` command shown above, or
-  `uv run --directory <repo> pf-helper`.
+  `uv --directory <repo> run pf-helper`.
 - **Store/MSIX Claude Desktop ignores your config edits:** you likely edited
   `%APPDATA%\Claude\...`, but the Store build reads the redirected
   `%LOCALAPPDATA%\Packages\<PackageFamilyName>\LocalCache\Roaming\Claude\...`
