@@ -1,6 +1,6 @@
-"""Build the SQLite + FTS5 index from a content source.
+"""Build the SQLite + FTS5 index from one or more content sources.
 
-`build_index` is pure (takes an explicit packs_root) for testability.
+`build_index` is pure (takes an explicit sources list) for testability.
 `main` handles cloning/pulling the Foundry repo and wiring config.
 """
 
@@ -8,26 +8,26 @@ from __future__ import annotations
 
 import subprocess
 from collections import Counter
-from pathlib import Path
+from collections.abc import Iterable
 
 from pf_helper.config import Config
-from pf_helper.ingest.sources import FoundrySource
+from pf_helper.ingest.sources import FoundrySource, Source
 from pf_helper.store import db
 
 
-def build_index(cfg: Config, packs_root: Path) -> dict[str, int]:
-    """Ingest from packs_root into a fresh DB. Returns per-category counts."""
+def build_index(cfg: Config, sources: Iterable[Source]) -> dict[str, int]:
+    """Ingest every source into a fresh DB. Returns per-category counts."""
     if cfg.db_path.exists():
         cfg.db_path.unlink()
     conn = db.connect(cfg.db_path)
     try:
         db.create_schema(conn)
-        source = FoundrySource(packs_root)
         counts: Counter[str] = Counter()
         batch = []
-        for entry in source.iter_entries():
-            batch.append(entry)
-            counts[entry.category] += 1
+        for source in sources:
+            for entry in source.iter_entries():
+                batch.append(entry)
+                counts[entry.category] += 1
         db.insert_entries(conn, batch)
     finally:
         conn.close()
@@ -50,7 +50,7 @@ def main() -> None:
     print(f"Ensuring Foundry repo at {cfg.foundry_dir} ...")
     _ensure_foundry_repo(cfg)
     print("Building index ...")
-    counts = build_index(cfg, packs_root=cfg.foundry_packs_root)
+    counts = build_index(cfg, [FoundrySource(cfg.foundry_packs_root)])
     total = sum(counts.values())
     print(f"Indexed {total} entries into {cfg.db_path}")
     for cat in sorted(counts):

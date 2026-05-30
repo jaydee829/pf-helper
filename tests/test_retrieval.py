@@ -2,6 +2,7 @@ from pathlib import Path
 
 from pf_helper.config import Config
 from pf_helper.ingest.build import build_index
+from pf_helper.ingest.sources import FoundrySource
 from pf_helper.retrieval.fts5 import Fts5Retriever, _excerpt
 
 FIXTURE_PACKS = Path(__file__).parent / "fixtures" / "foundry"
@@ -9,7 +10,7 @@ FIXTURE_PACKS = Path(__file__).parent / "fixtures" / "foundry"
 
 def _retriever(tmp_path) -> Fts5Retriever:
     cfg = Config(data_dir=tmp_path)
-    build_index(cfg, packs_root=FIXTURE_PACKS)
+    build_index(cfg, [FoundrySource(FIXTURE_PACKS)])
     return Fts5Retriever(cfg.db_path)
 
 
@@ -70,7 +71,7 @@ def test_factory_builds_fts5_retriever(tmp_path):
     from pf_helper.retrieval.fts5 import Fts5Retriever
 
     cfg = Config(data_dir=tmp_path)
-    build_index(cfg, packs_root=FIXTURE_PACKS)
+    build_index(cfg, [FoundrySource(FIXTURE_PACKS)])
     r = build_retriever(cfg)
     assert isinstance(r, Fts5Retriever)
 

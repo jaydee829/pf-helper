@@ -3,6 +3,7 @@ from pathlib import Path
 from pf_helper import server as srv
 from pf_helper.config import Config
 from pf_helper.ingest.build import build_index
+from pf_helper.ingest.sources import FoundrySource
 from pf_helper.models import Category
 
 FIXTURE_PACKS = Path(__file__).parent / "fixtures" / "foundry"
@@ -10,7 +11,7 @@ FIXTURE_PACKS = Path(__file__).parent / "fixtures" / "foundry"
 
 def _setup(tmp_path):
     cfg = Config(data_dir=tmp_path)
-    build_index(cfg, packs_root=FIXTURE_PACKS)
+    build_index(cfg, [FoundrySource(FIXTURE_PACKS)])
     srv.configure(cfg)
 
 
