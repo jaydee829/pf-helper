@@ -56,3 +56,14 @@ def test_empty_input_returns_empty():
 def test_multiple_enrichers_in_one_string():
     html = "Cast @UUID[Compendium.pf2e.x.Item.Fireball]{Fireball} to deal @Damage[6d6[fire]]"
     assert clean_text(html) == "Cast Fireball to deal 6d6 fire"
+
+
+def test_damage_parenthesized_formula():
+    # Real data has parenthesized/expression formulas, not just bare dice.
+    assert clean_text("deals @Damage[(1d10+14)[fire]] damage") == "deals (1d10+14) fire damage"
+
+
+def test_damage_expression_formula():
+    assert clean_text("@Damage[floor(@item.level/2)d6[bludgeoning]]") == (
+        "floor(@item.level/2)d6 bludgeoning"
+    )

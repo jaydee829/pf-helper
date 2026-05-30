@@ -7,6 +7,7 @@ The server performs no LLM calls — Claude reasons over what these return.
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
@@ -22,6 +23,10 @@ mcp = FastMCP("PF_Helper")
 
 _cfg: Config = Config.from_env()
 _retriever: Retriever | None = None
+# Guards lazy _retriever init. Today's stdio transport runs sync tools on the
+# event-loop thread (no concurrency), but a non-stdio transport could dispatch
+# from a thread pool; the lock keeps the lazy init a correct singleton either way.
+_lock = threading.Lock()
 
 
 def configure(cfg: Config) -> None:
@@ -34,12 +39,15 @@ def configure(cfg: Config) -> None:
 def _get_retriever() -> Retriever | None:
     global _retriever
     if _retriever is None:
-        if not Path(_cfg.db_path).exists():
-            _log.warning(
-                "Index not found at %s -- run `pf-helper-ingest` to build it.", _cfg.db_path
-            )
-            return None
-        _retriever = build_retriever(_cfg)
+        with _lock:
+            if _retriever is None:
+                if not Path(_cfg.db_path).exists():
+                    _log.warning(
+                        "Index not found at %s -- run `pf-helper-ingest` to build it.",
+                        _cfg.db_path,
+                    )
+                    return None
+                _retriever = build_retriever(_cfg)
     return _retriever
 
 

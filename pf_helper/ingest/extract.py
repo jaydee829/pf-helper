@@ -78,7 +78,7 @@ def _spell(s: Mapping) -> tuple[tuple[str, str], ...]:
         if area.get("details"):
             area_str = area["details"]
         elif area.get("value") is not None:
-            area_str = f"{area['value']}-foot {area.get('type', '')}".strip()
+            area_str = f"{area['value']}-foot {area.get('type') or ''}".strip()
     traditions = _g(s, "traits", "traditions")
     trad_str = ", ".join(traditions) if isinstance(traditions, list) and traditions else None
     return _pairs(

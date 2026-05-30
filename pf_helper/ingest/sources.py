@@ -69,7 +69,9 @@ class FoundrySource(Source):
     def _load(self, path: Path) -> Entry | None:
         try:
             doc = json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError, OSError:
+        except OSError:
+            return None
+        except json.JSONDecodeError:
             return None
         if not isinstance(doc, dict):
             return None  # skip top-level JSON arrays (not Foundry documents)

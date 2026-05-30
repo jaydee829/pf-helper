@@ -89,3 +89,8 @@ def test_zero_values_are_not_dropped():
 def test_spell_area_details_string_takes_precedence():
     system = {"level": {"value": 1}, "area": {"type": "emanation", "value": 30, "details": "cone"}}
     assert dict(extract_stats("spell", system))["Area"] == "cone"
+
+
+def test_spell_area_type_none_does_not_leak_none():
+    system = {"level": {"value": 1}, "area": {"type": None, "value": 20, "details": ""}}
+    assert dict(extract_stats("spell", system))["Area"] == "20-foot"

@@ -14,8 +14,10 @@ from bs4 import BeautifulSoup
 _UUID_LABELLED = re.compile(r"@UUID\[[^\]]*\]\{([^}]*)\}")
 # @UUID[Compendium.pack.id.Item.Name] -> Name  (last dot-separated segment inside brackets)
 _UUID_BARE = re.compile(r"@UUID\[[^\]]*?([^.\]]+)\]")
-# @Damage[expr[types]] (ignores any |options) -> "expr types"
-_DAMAGE = re.compile(r"@Damage\[([0-9dD+\- ]+)\[([^\]]+)\][^\]]*\]")
+# @Damage[expr[types]] (ignores any |options) -> "expr types". The formula
+# part is [^\[]+ rather than a dice-only class: real data has parenthesized and
+# expression formulas like (1d10+14), floor(@item.level/2)d6, (@item.level).
+_DAMAGE = re.compile(r"@Damage\[([^\[]+)\[([^\]]+)\][^\]]*\]")
 # @Check[stat|dc:N|...] -> "stat check (DC N)"  /  @Check[stat] -> "stat check"
 _CHECK = re.compile(r"@Check\[([^\]]+)\]")
 # @Template[shape|distance:N|...] -> "N-foot shape"
