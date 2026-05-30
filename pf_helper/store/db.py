@@ -38,14 +38,15 @@ def insert_entries(conn: sqlite3.Connection, entries: Iterable[Entry]) -> int:
             e.source_book,
             e.text,
             json.dumps([list(pair) for pair in e.stats]),
+            e.source_url,
             e.raw_json,
         )
         for e in entries
     ]
     conn.executemany(
         "INSERT OR REPLACE INTO entries "
-        "(id, name, category, traits, level, source_book, text, stats_json, raw_json) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "(id, name, category, traits, level, source_book, text, stats_json, source_url, raw_json) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         rows,
     )
     # Sync strategy: this is an external-content FTS5 table with no triggers,

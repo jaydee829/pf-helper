@@ -61,3 +61,11 @@ def test_to_match_query_edge_cases():
     assert db._to_match_query('"') == '""'  # quote-only stripped to empty
     assert db._to_match_query("fire damage") == '"fire" OR "damage"'
     assert db._to_match_query('fire"damage') == '"fire" OR "damage"'  # embedded quote split
+
+
+def test_source_url_roundtrips(tmp_path):
+    conn = db.connect(tmp_path / "t.db")
+    db.create_schema(conn)
+    db.insert_entries(conn, [_entry(source_url="https://2e.aonprd.com/Traits.aspx?ID=1")])
+    row = db.get_by_name(conn, "Frightened", category="condition")
+    assert row["source_url"] == "https://2e.aonprd.com/Traits.aspx?ID=1"
