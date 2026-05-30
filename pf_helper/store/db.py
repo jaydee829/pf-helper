@@ -14,7 +14,9 @@ from pf_helper.models import Entry
 def connect(path: str | Path) -> sqlite3.Connection:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path)
+    # check_same_thread=False: the server may serve tool calls from a worker
+    # thread; the workload is read-mostly so SQLite's internal locking is safe.
+    conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
