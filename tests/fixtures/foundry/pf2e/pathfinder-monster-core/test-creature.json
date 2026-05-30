@@ -1,0 +1,14 @@
+{
+  "_id": "creat123",
+  "name": "Test Beast",
+  "type": "npc",
+  "system": {
+    "description": { "value": "<p>A fearsome test beast.</p>" },
+    "details": { "level": { "value": 6 } },
+    "attributes": { "ac": { "value": 24 }, "hp": { "max": 120 }, "speed": { "value": 25 } },
+    "perception": { "mod": 13 },
+    "saves": { "fortitude": { "value": 16 }, "reflex": { "value": 14 }, "will": { "value": 11 } },
+    "publication": { "title": "Monster Core" },
+    "traits": { "size": { "value": "med" }, "value": ["beast"] }
+  }
+}

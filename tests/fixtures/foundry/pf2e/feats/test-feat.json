@@ -1,0 +1,11 @@
+{
+  "_id": "abc123",
+  "name": "Test Feat",
+  "type": "feat",
+  "system": {
+    "description": { "value": "<p>Become @UUID[Compendium.pf2e.conditionitems.Item.Sickened]{Sickened 1}.</p>" },
+    "level": { "value": 4 },
+    "publication": { "title": "Player Core" },
+    "traits": { "value": ["general", "skill"] }
+  }
+}

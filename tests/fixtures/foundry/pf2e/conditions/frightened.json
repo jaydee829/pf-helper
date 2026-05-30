@@ -1,0 +1,10 @@
+{
+  "_id": "TBSHQspnbcqxsmjL",
+  "name": "Frightened",
+  "type": "condition",
+  "system": {
+    "description": { "value": "<p>You're gripped by fear and take a status penalty equal to this value to all your checks and DCs.</p>" },
+    "publication": { "title": "Pathfinder Player Core" },
+    "traits": { "value": [] }
+  }
+}

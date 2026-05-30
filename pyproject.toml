@@ -1,0 +1,40 @@
+[project]
+name = "pf-helper"
+version = "0.1.0"
+description = "Local MCP server exposing Pathfinder 2e rules to Claude."
+readme = "README.md"
+authors = [
+    { name = "Justin Merrick", email = "jaydee829@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "mcp[cli]",
+    "beautifulsoup4",
+]
+
+[project.scripts]
+pf-helper = "pf_helper.server:main"
+pf-helper-ingest = "pf_helper.ingest.build:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pf_helper"]
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pytest",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
