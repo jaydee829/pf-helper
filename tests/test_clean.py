@@ -67,3 +67,15 @@ def test_damage_expression_formula():
     assert clean_text("@Damage[floor(@item.level/2)d6[bludgeoning]]") == (
         "floor(@item.level/2)d6 bludgeoning"
     )
+
+
+def test_damage_typeless_bare_keeps_formula():
+    assert clean_text("deals @Damage[10d6] damage") == "deals 10d6 damage"
+
+
+def test_damage_typeless_drops_options():
+    assert clean_text("@Damage[(@actor.level)|options:area-damage] hits") == "(@actor.level) hits"
+
+
+def test_damage_typeless_with_label_uses_label():
+    assert clean_text("take @Damage[1]{1 damage} now") == "take 1 damage now"

@@ -17,7 +17,11 @@ _UUID_BARE = re.compile(r"@UUID\[[^\]]*?([^.\]]+)\]")
 # @Damage[expr[types]] (ignores any |options) -> "expr types". The formula
 # part is [^\[]+ rather than a dice-only class: real data has parenthesized and
 # expression formulas like (1d10+14), floor(@item.level/2)d6, (@item.level).
-_DAMAGE = re.compile(r"@Damage\[([^\[]+)\[([^\]]+)\][^\]]*\]")
+_DAMAGE_TYPED = re.compile(r"@Damage\[([^\[]+)\[([^\]]+)\][^\]]*\]")
+# Typeless @Damage with a label: @Damage[formula|opts]{Label} -> Label.
+_DAMAGE_LABELLED = re.compile(r"@Damage\[[^\[\]]*\]\{([^}]*)\}")
+# Typeless @Damage, no label: @Damage[formula|opts] -> formula (drop |options).
+_DAMAGE_BARE = re.compile(r"@Damage\[([^\[\]]*)\]")
 # @Check[stat|dc:N|...] -> "stat check (DC N)"  /  @Check[stat] -> "stat check"
 _CHECK = re.compile(r"@Check\[([^\]]+)\]")
 # @Template[shape|distance:N|...] -> "N-foot shape"
@@ -35,6 +39,11 @@ def _render_damage(m: re.Match[str]) -> str:
     dice = m.group(1).strip()
     types = " ".join(t.strip() for t in m.group(2).split(","))
     return f"{dice} {types}".strip()
+
+
+def _render_damage_bare(m: re.Match[str]) -> str:
+    # Typeless damage: keep the formula, drop any |options suffix.
+    return m.group(1).split("|")[0].strip()
 
 
 def _render_check(m: re.Match[str]) -> str:
@@ -62,7 +71,9 @@ def _render_template(m: re.Match[str]) -> str:
 def _resolve_enrichers(text: str) -> str:
     text = _UUID_LABELLED.sub(lambda m: m.group(1), text)
     text = _UUID_BARE.sub(lambda m: m.group(1), text)
-    text = _DAMAGE.sub(_render_damage, text)
+    text = _DAMAGE_TYPED.sub(_render_damage, text)
+    text = _DAMAGE_LABELLED.sub(lambda m: m.group(1), text)
+    text = _DAMAGE_BARE.sub(_render_damage_bare, text)
     text = _CHECK.sub(_render_check, text)
     text = _TEMPLATE.sub(_render_template, text)
     text = _EMBED_LABELLED.sub(lambda m: m.group(1), text)
