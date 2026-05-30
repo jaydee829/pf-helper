@@ -24,8 +24,10 @@ _BLOCK_CLOSE = re.compile(
     r"</(?:title|row|column|traits|p|li|h[1-6]|td|th|tr|thead|tbody|tfoot|table|ul|ol|aside)>",
     re.IGNORECASE,
 )
-# Any remaining tag (opening, closing, or self-closing) is dropped.
-_TAG = re.compile(r"<[^>]+>")
+# Any remaining tag (opening, closing, or self-closing) is dropped. Requiring a
+# leading letter (or "/letter") means a literal "<" in prose (e.g. "damage < 5")
+# is left alone rather than mistaken for a tag.
+_TAG = re.compile(r"</?[a-zA-Z][^>]*>")
 
 
 def _normalize_ws(text: str) -> str:

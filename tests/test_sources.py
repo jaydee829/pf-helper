@@ -74,3 +74,25 @@ def test_aon_source_maps_traits_and_level():
     assert ritual.level == 2
     assert ritual.traits == ("Transmutation", "Uncommon")
     assert ritual.source_url == "https://2e.aonprd.com/Rituals.aspx?ID=1"
+
+
+def test_aon_source_skips_corrupt_cache_file(tmp_path):
+    # Invalid UTF-8 in one category file must be skipped, not crash the build.
+    (tmp_path / "trait.json").write_bytes(b"\xff\xfe not valid utf-8")
+    (tmp_path / "ritual.json").write_text(
+        '[{"id":"ritual-9","name":"Test Ritual","category":"ritual",'
+        '"url":"/Rituals.aspx?ID=9","markdown":"A test ritual."}]',
+        encoding="utf-8",
+    )
+    names = [e.name for e in AonSource(tmp_path).iter_entries()]
+    assert names == ["Test Ritual"]  # corrupt trait.json skipped, ritual still read
+
+
+def test_aon_source_url_tolerates_missing_leading_slash(tmp_path):
+    (tmp_path / "trait.json").write_text(
+        '[{"id":"trait-9","name":"Oddurl","category":"trait",'
+        '"url":"Traits.aspx?ID=9","markdown":"x"}]',
+        encoding="utf-8",
+    )
+    entry = next(iter(AonSource(tmp_path).iter_entries()))
+    assert entry.source_url == "https://2e.aonprd.com/Traits.aspx?ID=9"

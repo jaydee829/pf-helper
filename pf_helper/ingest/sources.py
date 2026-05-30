@@ -150,7 +150,9 @@ class AonSource(Source):
                 docs = json.loads(path.read_text(encoding="utf-8"))
             except OSError:
                 continue
-            except json.JSONDecodeError:
+            except ValueError:
+                # Covers JSONDecodeError and UnicodeDecodeError from a corrupt
+                # or partially-written cache file -- skip it rather than crash.
                 continue
             if not isinstance(docs, list):
                 continue
@@ -179,7 +181,7 @@ class AonSource(Source):
             source_book=doc.get("primary_source"),
             text=clean_aon(doc.get("markdown") or ""),
             raw_json=json.dumps(doc, separators=(",", ":")),
-            source_url=f"https://2e.aonprd.com{url}" if url else "",
+            source_url=f"https://2e.aonprd.com/{url.lstrip('/')}" if url else "",
             # AON gap categories are narrative; no structured statblock (stats=()).
         )
 

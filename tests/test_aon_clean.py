@@ -44,3 +44,8 @@ def test_table_cells_become_lines():
 
 def test_actions_cost_is_preserved():
     assert clean_aon('<actions string="Two Actions" /> command') == "[Two Actions] command"
+
+
+def test_inequalities_in_prose_not_stripped():
+    # A literal "<"/">" in prose must not be mistaken for a tag boundary.
+    assert clean_aon("if damage < 5 and AC > 20 then") == "if damage < 5 and AC > 20 then"
