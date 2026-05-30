@@ -7,6 +7,7 @@ import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from pathlib import Path
+from urllib.parse import quote_plus
 
 from pf_helper.ingest.clean import clean_text
 from pf_helper.ingest.extract import extract_stats
@@ -95,6 +96,7 @@ class FoundrySource(Source):
             text=clean_text(html),
             raw_json=json.dumps(doc, separators=(",", ":")),
             stats=extract_stats(category, system),
+            source_url=f"https://2e.aonprd.com/Search.aspx?q={quote_plus(doc['name'])}",
         )
 
 

@@ -44,3 +44,9 @@ def test_creature_stats_are_populated():
     stats = dict(beast.stats)
     assert stats["AC"] == "24"
     assert stats["Saves"] == "Fort +16, Ref +14, Will +11"
+
+
+def test_foundry_entry_has_aon_search_url():
+    src = FoundrySource(FIXTURE_ROOT)
+    feat = next(e for e in src.iter_entries() if e.name == "Test Feat")
+    assert feat.source_url == "https://2e.aonprd.com/Search.aspx?q=Test+Feat"
