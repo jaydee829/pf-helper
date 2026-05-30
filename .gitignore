@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# uv
+# (keep uv.lock committed)
+
+# Project data (cloned repo + built index)
+data/
+
+# Unrelated FoundryVTT module checkout that lives in this working dir
+pf2e-peek/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
