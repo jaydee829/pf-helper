@@ -1,33 +1,36 @@
-"""Build the SQLite + FTS5 index from a content source.
+"""Build the SQLite + FTS5 index from one or more content sources.
 
-`build_index` is pure (takes an explicit packs_root) for testability.
+`build_index` is pure (takes an explicit sources list) for testability.
 `main` handles cloning/pulling the Foundry repo and wiring config.
 """
 
 from __future__ import annotations
 
+import json
 import subprocess
+import sys
+import urllib.request
 from collections import Counter
-from pathlib import Path
+from collections.abc import Iterable
 
 from pf_helper.config import Config
-from pf_helper.ingest.sources import FoundrySource
+from pf_helper.ingest.sources import AON_CATEGORIES, AonSource, FoundrySource, Source
 from pf_helper.store import db
 
 
-def build_index(cfg: Config, packs_root: Path) -> dict[str, int]:
-    """Ingest from packs_root into a fresh DB. Returns per-category counts."""
+def build_index(cfg: Config, sources: Iterable[Source]) -> dict[str, int]:
+    """Ingest every source into a fresh DB. Returns per-category counts."""
     if cfg.db_path.exists():
         cfg.db_path.unlink()
     conn = db.connect(cfg.db_path)
     try:
         db.create_schema(conn)
-        source = FoundrySource(packs_root)
         counts: Counter[str] = Counter()
         batch = []
-        for entry in source.iter_entries():
-            batch.append(entry)
-            counts[entry.category] += 1
+        for source in sources:
+            for entry in source.iter_entries():
+                batch.append(entry)
+                counts[entry.category] += 1
         db.insert_entries(conn, batch)
     finally:
         conn.close()
@@ -45,16 +48,47 @@ def _ensure_foundry_repo(cfg: Config) -> None:
         )
 
 
+def _ensure_aon_cache(cfg: Config, refresh: bool = False) -> None:
+    """Fetch each AON category from Elasticsearch into data/aon/<category>.json.
+
+    Skips categories already cached unless refresh=True. One bulk query per
+    category (size 10000); all target categories are well under that.
+    """
+    cfg.aon_dir.mkdir(parents=True, exist_ok=True)
+    for category in AON_CATEGORIES:
+        path = cfg.aon_dir / f"{category}.json"
+        if path.exists() and not refresh:
+            continue
+        body = json.dumps({"size": 10000, "query": {"match": {"category": category}}}).encode()
+        req = urllib.request.Request(
+            cfg.aon_es_url,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310
+            data = json.loads(resp.read())
+        docs = [hit["_source"] for hit in data["hits"]["hits"]]
+        path.write_text(json.dumps(docs), encoding="utf-8")
+        print(f"  fetched {category:18} {len(docs)}")
+
+
 def main() -> None:
     cfg = Config.from_env()
+    refresh = "--refresh" in sys.argv[1:]
     print(f"Ensuring Foundry repo at {cfg.foundry_dir} ...")
     _ensure_foundry_repo(cfg)
+    print(f"Ensuring AON cache at {cfg.aon_dir} (refresh={refresh}) ...")
+    _ensure_aon_cache(cfg, refresh=refresh)
     print("Building index ...")
-    counts = build_index(cfg, packs_root=cfg.foundry_packs_root)
+    counts = build_index(
+        cfg,
+        [FoundrySource(cfg.foundry_packs_root), AonSource(cfg.aon_dir)],
+    )
     total = sum(counts.values())
     print(f"Indexed {total} entries into {cfg.db_path}")
     for cat in sorted(counts):
-        print(f"  {cat:12} {counts[cat]}")
+        print(f"  {cat:18} {counts[cat]}")
 
 
 if __name__ == "__main__":

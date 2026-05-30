@@ -34,6 +34,7 @@ class Fts5Retriever(Retriever):
                 category=row["category"],
                 level=row["level"],
                 excerpt=_excerpt(row["text"]),
+                source_url=row["source_url"],
             )
             for row in rows
         ]
@@ -53,4 +54,5 @@ class Fts5Retriever(Retriever):
             source_book=row["source_book"],
             stats=stats,
             text=row["text"],
+            source_url=row["source_url"],
         )

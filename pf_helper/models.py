@@ -22,7 +22,30 @@ class Category(StrEnum):
     ACTION = "action"
     HAZARD = "hazard"
     DEITY = "deity"
-    # Deferred to AON supplement: trait, skill, archetype, rules.
+    # AON Elasticsearch supplement categories (not in the Foundry compendium).
+    TRAIT = "trait"
+    SKILL = "skill"
+    ARCHETYPE = "archetype"
+    RULES = "rules"
+    CLASS_FEATURE = "class-feature"
+    HERITAGE = "heritage"
+    BLOODLINE = "bloodline"
+    MYSTERY = "mystery"
+    PATRON = "patron"
+    LESSON = "lesson"
+    ARCANE_SCHOOL = "arcane-school"
+    DOMAIN = "domain"
+    IMPLEMENT = "implement"
+    IKON = "ikon"  # AON/PF2e spelling (Exemplar class), not "icon"
+    ANIMAL_COMPANION = "animal-companion"
+    FAMILIAR_ABILITY = "familiar-ability"
+    RITUAL = "ritual"
+    RELIC = "relic"
+    CURSE = "curse"
+    DISEASE = "disease"
+    LANGUAGE = "language"
+    PLANE = "plane"
+    VEHICLE = "vehicle"
 
 
 @dataclass(frozen=True)
@@ -40,6 +63,9 @@ class Entry:
     # Ordered (label, value) pairs for the statblock header; empty for
     # non-statblock categories (condition, ancestry, ...).
     stats: tuple[tuple[str, str], ...] = ()
+    # AON page link: exact deep link (AON entries) or search-by-name link
+    # (Foundry entries). Defaults empty for older construction sites.
+    source_url: str = ""
 
 
 class SearchHit(BaseModel):
@@ -50,6 +76,7 @@ class SearchHit(BaseModel):
     category: str
     level: int | None = Field(default=None, description="Level or spell rank, if any")
     excerpt: str = Field(description="Short snippet of the entry text")
+    source_url: str = Field(default="", description="AON page link for this entry")
 
 
 class EntryDetail(BaseModel):
@@ -68,3 +95,4 @@ class EntryDetail(BaseModel):
         description="Category-aware header fields (e.g. creature AC/HP/saves, spell range/area)",
     )
     text: str = Field(description="Full cleaned plain-text rules content")
+    source_url: str = Field(default="", description="AON page link for this entry")

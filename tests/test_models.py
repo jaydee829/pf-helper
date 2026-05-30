@@ -47,3 +47,31 @@ def test_entry_detail_defaults_and_stats_dict():
         stats={"AC": "16", "HP": "6"},
     )
     assert populated.stats["AC"] == "16"
+
+
+def test_new_aon_category_values():
+    assert Category.TRAIT == "trait"
+    assert Category.RULES == "rules"
+    assert Category("class-feature") is Category.CLASS_FEATURE
+    assert Category("familiar-ability") is Category.FAMILIAR_ABILITY
+
+
+def test_entry_has_source_url_default():
+    e = Entry(
+        id="trait:x-trait-1",
+        name="X",
+        category="trait",
+        traits=(),
+        level=None,
+        source_book="Core Rulebook",
+        text="t",
+        raw_json="{}",
+    )
+    assert e.source_url == ""  # default; sources populate it
+
+
+def test_models_carry_source_url():
+    hit = SearchHit(id="a", name="A", category="trait", excerpt="e", source_url="https://x")
+    detail = EntryDetail(id="a", name="A", category="trait", text="t", source_url="https://x")
+    assert hit.source_url == "https://x"
+    assert detail.source_url == "https://x"

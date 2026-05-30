@@ -2,6 +2,7 @@ from pathlib import Path
 
 from pf_helper.config import Config
 from pf_helper.ingest.build import build_index
+from pf_helper.ingest.sources import AonSource, FoundrySource
 from pf_helper.store import db
 
 FIXTURE_PACKS = Path(__file__).parent / "fixtures" / "foundry"
@@ -9,7 +10,7 @@ FIXTURE_PACKS = Path(__file__).parent / "fixtures" / "foundry"
 
 def test_build_index_from_local_packs(tmp_path):
     cfg = Config(data_dir=tmp_path)
-    counts = build_index(cfg, packs_root=FIXTURE_PACKS)
+    counts = build_index(cfg, [FoundrySource(FIXTURE_PACKS)])
     assert counts["feat"] >= 1
     assert counts["condition"] >= 1
 
@@ -21,9 +22,25 @@ def test_build_index_from_local_packs(tmp_path):
 def test_build_index_is_idempotent(tmp_path):
     # Rebuilding over an existing db must delete + recreate cleanly.
     cfg = Config(data_dir=tmp_path)
-    first = build_index(cfg, packs_root=FIXTURE_PACKS)
-    second = build_index(cfg, packs_root=FIXTURE_PACKS)
+    first = build_index(cfg, [FoundrySource(FIXTURE_PACKS)])
+    second = build_index(cfg, [FoundrySource(FIXTURE_PACKS)])
     assert first == second
     conn = db.connect(cfg.db_path)
     (total,) = conn.execute("SELECT COUNT(*) FROM entries").fetchone()
     assert total == sum(second.values())  # no duplicate rows after rebuild
+
+
+AON_FIXTURE_DIR = Path(__file__).parent / "fixtures" / "aon"
+
+
+def test_build_index_combines_foundry_and_aon(tmp_path):
+    cfg = Config(data_dir=tmp_path)
+    counts = build_index(cfg, [FoundrySource(FIXTURE_PACKS), AonSource(AON_FIXTURE_DIR)])
+    assert counts["condition"] >= 1  # from Foundry
+    assert counts["trait"] >= 1  # from AON
+    assert counts["ritual"] >= 1  # from AON
+
+    conn = db.connect(cfg.db_path)
+    row = db.get_by_name(conn, "Aberration", category="trait")
+    assert row is not None
+    assert row["source_url"] == "https://2e.aonprd.com/Traits.aspx?ID=1"

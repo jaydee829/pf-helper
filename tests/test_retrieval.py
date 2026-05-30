@@ -2,6 +2,7 @@ from pathlib import Path
 
 from pf_helper.config import Config
 from pf_helper.ingest.build import build_index
+from pf_helper.ingest.sources import FoundrySource
 from pf_helper.retrieval.fts5 import Fts5Retriever, _excerpt
 
 FIXTURE_PACKS = Path(__file__).parent / "fixtures" / "foundry"
@@ -9,7 +10,7 @@ FIXTURE_PACKS = Path(__file__).parent / "fixtures" / "foundry"
 
 def _retriever(tmp_path) -> Fts5Retriever:
     cfg = Config(data_dir=tmp_path)
-    build_index(cfg, packs_root=FIXTURE_PACKS)
+    build_index(cfg, [FoundrySource(FIXTURE_PACKS)])
     return Fts5Retriever(cfg.db_path)
 
 
@@ -70,7 +71,7 @@ def test_factory_builds_fts5_retriever(tmp_path):
     from pf_helper.retrieval.fts5 import Fts5Retriever
 
     cfg = Config(data_dir=tmp_path)
-    build_index(cfg, packs_root=FIXTURE_PACKS)
+    build_index(cfg, [FoundrySource(FIXTURE_PACKS)])
     r = build_retriever(cfg)
     assert isinstance(r, Fts5Retriever)
 
@@ -86,3 +87,17 @@ def test_factory_rejects_unknown_retriever(tmp_path):
     cfg = replace(Config(data_dir=tmp_path), retriever="bogus")
     with pytest.raises(ValueError, match="Unknown retriever"):
         build_retriever(cfg)
+
+
+def test_get_includes_source_url(tmp_path):
+    r = _retriever(tmp_path)
+    detail = r.get("Frightened", category="condition")
+    assert detail is not None
+    assert detail.source_url == "https://2e.aonprd.com/Search.aspx?q=Frightened"
+
+
+def test_search_hits_include_source_url(tmp_path):
+    r = _retriever(tmp_path)
+    hits = r.search("status penalty", category="condition", limit=5)
+    hit = next(h for h in hits if h.name == "Frightened")
+    assert hit.source_url == "https://2e.aonprd.com/Search.aspx?q=Frightened"

@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS entries (
     source_book TEXT,
     text        TEXT NOT NULL,
     stats_json  TEXT NOT NULL DEFAULT '[]',  -- JSON array of [label, value] pairs
+    source_url  TEXT NOT NULL DEFAULT '',     -- AON page link
     raw_json    TEXT NOT NULL
 );
 
