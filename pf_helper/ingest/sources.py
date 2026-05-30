@@ -80,9 +80,11 @@ class FoundrySource(Source):
         system = doc.get("system", {})
         html = (system.get("description") or {}).get("value", "")
         return Entry(
-            # Human-readable slug id; uniqueness across packs is verified during
-            # the real-data build (Task 9). Lookups are by name, not id.
-            id=f"{category}:{_slug(doc['name'])}",
+            # Human-readable slug plus the Foundry _id, which is unique within the
+            # compendium. The _id suffix prevents same-name/same-category documents
+            # (e.g. creature variants across books) from colliding on the primary
+            # key and being silently dropped at build time. Lookups are by name.
+            id=f"{category}:{_slug(doc['name'])}-{doc['_id']}",
             name=doc["name"],
             category=category,
             traits=tuple((system.get("traits") or {}).get("value") or []),

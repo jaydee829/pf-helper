@@ -25,7 +25,7 @@ def test_entry_fields_are_mapped_and_cleaned():
     assert feat.level == 4
     assert feat.source_book == "Player Core"
     assert feat.traits == ("general", "skill")
-    assert feat.id == "feat:test-feat"
+    assert feat.id == "feat:test-feat-abc123"  # slug + Foundry _id for uniqueness
     assert "Sickened 1" in feat.text  # enricher resolved
     assert "@UUID" not in feat.text
 
