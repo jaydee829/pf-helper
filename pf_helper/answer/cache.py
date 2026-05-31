@@ -101,17 +101,43 @@ class AnswerCache:
         )
         self._conn.commit()
 
-    def get(self, question: str) -> Answer | None:
+    def get(self, question: str, *, fuzzy: bool = True) -> Answer | None:
         norm = normalize_question(question)
         row = self._conn.execute("SELECT * FROM answers WHERE norm = ?", (norm,)).fetchone()
-        if row is None:
-            return None
-        stale = row["index_version"] != index_version(self.index_db_path)
-        expired = (time.time() - row["created_at"]) > self.ttl_seconds
-        if stale or expired:
+        if row is not None:
+            if self._is_live(row):
+                return self._to_answer(row)
             self._conn.execute("DELETE FROM answers WHERE norm = ?", (norm,))
             self._conn.commit()
+        if not fuzzy or self.similarity <= 0:
             return None
+        qtokens = _content_tokens(question)
+        if not qtokens:
+            return None
+        current = index_version(self.index_db_path)
+        cutoff = time.time() - self.ttl_seconds
+        best_row = None
+        best_score = 0.0
+        for r in self._conn.execute(
+            "SELECT * FROM answers WHERE index_version = ? AND created_at > ?",
+            (current, cutoff),
+        ):
+            score = _jaccard(qtokens, frozenset(r["tokens"].split()))
+            if score >= self.similarity and score > best_score:
+                best_row, best_score = r, score
+        if best_row is None:
+            return None
+        ans = self._to_answer(best_row)
+        ans.match_score = best_score
+        ans.matched_question = best_row["norm"]
+        return ans
+
+    def _is_live(self, row: sqlite3.Row) -> bool:
+        stale = row["index_version"] != index_version(self.index_db_path)
+        expired = (time.time() - row["created_at"]) > self.ttl_seconds
+        return not (stale or expired)
+
+    def _to_answer(self, row: sqlite3.Row) -> Answer:
         sources = [tuple(s) for s in json.loads(row["sources_json"])]
         return Answer(text=row["text"], sources=sources, engine="cache")
 

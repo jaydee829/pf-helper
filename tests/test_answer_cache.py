@@ -108,3 +108,49 @@ def test_migration_recreates_tokenless_table(tmp_path):
     cols = {r[1] for r in cache._conn.execute("PRAGMA table_info(answers)").fetchall()}
     assert "tokens" in cols
     assert cache._conn.execute("SELECT COUNT(*) FROM answers").fetchone()[0] == 0  # recreated
+
+
+def test_fuzzy_hits_paraphrases(tmp_path):
+    cache, _ = _cache(tmp_path)
+    cache.put("How does flanking work?", Answer("Flank text", [("Flanking", "u")], "agent"))
+    for q in ["When am I flanking again?", "What is flanking?", "What are the rules for flanking?"]:
+        hit = cache.get(q)
+        assert hit is not None, q
+        assert hit.text == "Flank text"
+        assert hit.engine == "cache"
+        assert hit.match_score is not None and hit.match_score >= 0.5
+        assert hit.matched_question == "how does flanking work"
+
+
+def test_fuzzy_misses_distinct_question(tmp_path):
+    cache, _ = _cache(tmp_path)
+    cache.put("What is flanking?", Answer("Flank text", [("Flanking", "u")], "agent"))
+    assert cache.get("can tiny creatures flank?") is None  # jaccard 1/3 < 0.5
+
+
+def test_fuzzy_disabled_per_call(tmp_path):
+    cache, _ = _cache(tmp_path)
+    cache.put("How does flanking work?", Answer("Flank text", [("Flanking", "u")], "agent"))
+    assert cache.get("what is flanking?", fuzzy=False) is None  # exact-only
+    assert cache.get("how does flanking work", fuzzy=False) is not None  # exact still hits
+
+
+def test_similarity_zero_disables_fuzzy(tmp_path):
+    index = tmp_path / "pf2e.db"
+    index.write_text("v1")
+    cache = AnswerCache(tmp_path / "ask_cache.db", index, similarity=0.0)
+    cache.put("How does flanking work?", Answer("t", [("n", "u")], "agent"))
+    assert cache.get("what is flanking?") is None
+
+
+def test_fuzzy_skips_stale_rows(tmp_path):
+    cache, index = _cache(tmp_path)
+    cache.put("How does flanking work?", Answer("t", [("n", "u")], "agent"))
+    index.write_text("v2-bigger-changed")  # bust index_version
+    assert cache.get("what is flanking?") is None
+
+
+def test_fuzzy_skips_empty_token_question(tmp_path):
+    cache, _ = _cache(tmp_path)
+    cache.put("How does flanking work?", Answer("t", [("n", "u")], "agent"))
+    assert cache.get("what is it?") is None  # all stopwords -> no tokens -> no match
