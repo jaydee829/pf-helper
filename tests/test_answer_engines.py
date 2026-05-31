@@ -67,3 +67,46 @@ async def test_rag_no_hits_returns_no_match(monkeypatch):
     answer = await ContextRagAnswerer(r).answer("nonsense")
     assert answer.sources == []
     assert "no matching" in answer.text.lower()
+
+
+@pytest.mark.asyncio
+async def test_agent_returns_text(monkeypatch):
+    r = FakeRetriever([], {})
+    captured = {}
+    _patch_query(monkeypatch, captured, reply="Per the rules, yes.")
+    from pf_helper.answer.engines import AgentMcpAnswerer
+
+    answer = await AgentMcpAnswerer(r).answer("can I do X?")
+    assert answer.text == "Per the rules, yes."
+    assert answer.engine == "agent"
+    opts = captured["options"]
+    assert "pf2e" in opts.mcp_servers
+    assert set(opts.allowed_tools) == {"mcp__pf2e__search", "mcp__pf2e__get_entry"}
+
+
+@pytest.mark.asyncio
+async def test_agent_tool_functions_record_sources(monkeypatch):
+    hit = SearchHit(
+        id="spell:heal",
+        name="Heal",
+        category="spell",
+        excerpt="heal...",
+        source_url="https://2e.aonprd.com/Spells.aspx?ID=1",
+    )
+    detail = EntryDetail(
+        id="spell:heal",
+        name="Heal",
+        category="spell",
+        text="Heal a creature.",
+        source_url=hit.source_url,
+    )
+    r = FakeRetriever([hit], {"Heal": detail})
+    from pf_helper.answer.engines import AgentMcpAnswerer
+
+    eng = AgentMcpAnswerer(r)
+    search_fn, get_fn, sources = eng._build_tools()  # plain callables + the sources sink
+    out = await search_fn({"query": "heal", "category": ""})
+    assert "Heal" in out["content"][0]["text"]
+    assert ("Heal", hit.source_url) in sources.items()
+    out2 = await get_fn({"name": "Heal", "category": "spell"})
+    assert "Heal a creature." in out2["content"][0]["text"]
