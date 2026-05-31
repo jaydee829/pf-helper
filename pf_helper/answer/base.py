@@ -13,6 +13,8 @@ class Answer:
     text: str
     sources: list[tuple[str, str]] = field(default_factory=list)  # (name, source_url)
     engine: str = ""  # "agent" | "rag" | "cache"
+    match_score: float | None = None  # fuzzy-cache similarity, when applicable
+    matched_question: str | None = None  # the cached (normalized) question matched
 
 
 class AnswerError(Exception):

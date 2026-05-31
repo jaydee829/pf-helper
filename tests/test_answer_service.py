@@ -9,16 +9,22 @@ def test_answer_defaults():
     a = Answer(text="hi")
     assert a.sources == []
     assert a.engine == ""
+    assert a.match_score is None
+    assert a.matched_question is None
 
 
 def test_answer_config_from_env(monkeypatch):
     monkeypatch.setenv("PF_HELPER_ASK_ENGINE", "B")
     monkeypatch.setenv("PF_HELPER_ASK_CACHE", "0")
     monkeypatch.setenv("PF_HELPER_ASK_CACHE_TTL_DAYS", "7")
+    monkeypatch.setenv("PF_HELPER_ASK_CACHE_SIMILARITY", "0.7")
+    monkeypatch.setenv("PF_HELPER_ASK_QUERY_LOG", "0")
     cfg = AnswerConfig.from_env()
     assert cfg.engine == "b"  # lower-cased
     assert cfg.cache_enabled is False
     assert cfg.cache_ttl_days == 7
+    assert cfg.cache_similarity == 0.7
+    assert cfg.query_log_enabled is False
     assert cfg.core.db_path.name == "pf2e.db"
 
 
