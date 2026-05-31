@@ -31,16 +31,31 @@ single AON page gets that exact link, otherwise it keeps the search link.
 
 ## Scope: categories
 
-`AON_LINK_CATEGORIES` — the categories where the Foundry category value and the
-AON `category` value are identical (1:1), so no translation is needed:
+The fetched AON categories (`AON_LINK_CATEGORIES`):
 
 ```
-creature, spell, feat, hazard, condition, action, deity, ancestry, class, background
+creature, spell, feat, hazard, condition, action, deity, ancestry, class, background, heritage
 ```
 
-Verified against the live index: after the remaster filter (below), name
-collisions are rare (≈1–3% of entries), so ~97–99% of Foundry entries in these
-categories resolve to an exact link; the rest fall back to the search link.
+The first 10 have a Foundry category value identical to the AON `category`
+value (1:1). **`heritage` is the one exception:** Foundry maps its `heritage`
+document type to the `ancestry` category, but AON keeps heritages in a separate
+`heritage` category — so AON `heritage` entries are indexed under the Foundry
+`ancestry` category (a small `_AON_TO_FOUNDRY_CATEGORY = {"heritage": "ancestry"}`
+mapping; all others are identity).
+
+**Measured coverage (real-data, after the remaster filter below):** exact-link
+coverage is **~68% overall** across these Foundry categories, not uniform —
+class/deity/background/condition ~95–100%, spell 89%, feat 80%, **creature 55%**,
+hazard 44%, action 22%, and **ancestry ~99% once heritages are matched** (66
+ancestry + 302 heritage of 372; the heritage match lifts ancestry from ~18%).
+The unmatched remainder is mostly content that genuinely isn't a standalone AON
+page — adventure-path NPCs and variant statblocks (creatures), deity boon/curse
+items and special feats — not a name-formatting problem; those keep the search
+link (no regression). Commonly-looked-up entries (remastered Monster Core
+creatures, core spells/feats) match, so the practical hit rate exceeds the raw
+per-entry percentage. An earlier estimate of ~97–99% was wrong — it measured
+AON's internal name-uniqueness, not the Foundry→AON join rate.
 
 ## Disambiguation: prefer remaster, then fall back
 
@@ -149,7 +164,9 @@ Rebuild via `pf-helper-ingest`, then:
 - Confirm a known remastered creature (e.g. `Arbiter`) resolves to an exact
   `/Monsters.aspx?ID=...` link via `get_entry`.
 - Measure coverage: % of Foundry entries in the link-categories whose `source_url`
-  is now an exact AON page vs. a `Search.aspx?q=` fallback (expect ~97–99% exact).
+  is now an exact AON page vs. a `Search.aspx?q=` fallback (measured ~68% overall;
+  see Scope for the per-category breakdown — ancestry ~99% with the heritage match,
+  creature ~55%, etc.).
 - Confirm a known same-name collision falls back to the search link.
 
 ## Operational notes
@@ -163,5 +180,10 @@ Rebuild via `pf-helper-ingest`, then:
 
 - **Equipment** exact links (merge AON weapon/armor/shield/consumable/treasure/…
   into one equipment name→url map).
-- Fuzzy matching for the residual ~1–3% (legacy renames, genuine same-name
-  variants) — currently those keep the search link.
+- Higher creature/feat/hazard/action coverage. Investigation showed the bulk of
+  those fallbacks are content that genuinely isn't a standalone AON page
+  (adventure-path NPCs and variant statblocks; deity boon/curse items; embedded
+  creature actions), not a name-formatting issue — so they are not safely
+  recoverable by name manipulation (fuzzy/suffix matching would risk linking to
+  the wrong page). Left as search-link fallbacks. Any future improvement here
+  needs a more reliable join key than the name.
