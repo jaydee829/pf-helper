@@ -14,7 +14,9 @@ from pathlib import Path
 
 from pf_helper.ingest.sources import _slug
 
-# Categories whose Foundry category value == AON `category` value (1:1).
+# Categories to fetch from AON; most map 1:1 to Foundry's category values.
+# 'heritage' is the exception: AON keeps heritages in their own category, but
+# Foundry maps its heritage document type to the 'ancestry' category.
 AON_LINK_CATEGORIES: tuple[str, ...] = (
     "creature",
     "spell",
@@ -26,9 +28,14 @@ AON_LINK_CATEGORIES: tuple[str, ...] = (
     "ancestry",
     "class",
     "background",
+    "heritage",
 )
 
 _AON_BASE = "https://2e.aonprd.com"
+
+# AON 'heritage' entries belong to Foundry's 'ancestry' category (Foundry maps
+# its heritage document type to 'ancestry'); all others map to themselves.
+_AON_TO_FOUNDRY_CATEGORY: dict[str, str] = {"heritage": "ancestry"}
 
 
 class AonLinkIndex:
@@ -62,7 +69,8 @@ def build_link_index(link_dir: str | Path) -> AonLinkIndex:
             url = doc.get("url")
             if not name or not url:
                 continue
-            key = (category, _slug(name))
+            foundry_category = _AON_TO_FOUNDRY_CATEGORY.get(category, category)
+            key = (foundry_category, _slug(name))
             candidates.setdefault(key, set()).add(f"{_AON_BASE}/{url.lstrip('/')}")
     mapping = {key: next(iter(urls)) for key, urls in candidates.items() if len(urls) == 1}
     return AonLinkIndex(mapping)

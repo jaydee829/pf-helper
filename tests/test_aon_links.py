@@ -55,3 +55,20 @@ def test_normalization_matches_varied_casing_and_spacing(tmp_path):
 def test_empty_dir_is_safe(tmp_path):
     idx = build_link_index(tmp_path)
     assert idx.url_for("creature", "Anything") is None
+
+
+def test_heritage_entries_indexed_under_ancestry(tmp_path):
+    _write(tmp_path, "ancestry", [{"name": "Elf", "url": "/Ancestries.aspx?ID=1"}])
+    _write(tmp_path, "heritage", [{"name": "Versatile Heritage", "url": "/Heritages.aspx?ID=5"}])
+    idx = build_link_index(tmp_path)
+    # Foundry puts heritages in the 'ancestry' category; both resolve under it.
+    assert idx.url_for("ancestry", "Elf") == "https://2e.aonprd.com/Ancestries.aspx?ID=1"
+    assert (
+        idx.url_for("ancestry", "Versatile Heritage") == "https://2e.aonprd.com/Heritages.aspx?ID=5"
+    )
+
+
+def test_heritage_in_link_categories():
+    from pf_helper.ingest.aon_links import AON_LINK_CATEGORIES
+
+    assert "heritage" in AON_LINK_CATEGORIES  # so the fetch loop pulls heritage.json
