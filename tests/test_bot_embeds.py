@@ -5,6 +5,7 @@ from pf_helper.bot.config import BotConfig
 from pf_helper.bot.embeds import (
     answer_embed,
     lookup_embed,
+    lookup_miss_embed,
     search_embeds,
     split_message,
     truncate,
@@ -75,3 +76,33 @@ def test_answer_embed_has_sources_field():
     assert "Yes you can." in e.description
     src = " ".join(f"{f.name}:{f.value}" for f in e.fields)
     assert "Flanking" in src and "https://2e.aonprd.com/x" in src
+
+
+def test_answer_embed_fuzzy_footer():
+    ans = Answer(text="x", sources=[("n", "u")], engine="cache", match_score=0.83,
+                 matched_question="flank")
+    e = answer_embed(ans)
+    assert "cache" in e.footer.text and "0.83" in e.footer.text
+
+
+def test_answer_embed_plain_footer_unchanged():
+    e = answer_embed(Answer(text="x", sources=[("n", "u")], engine="agent"))
+    assert e.footer.text == "answered via agent"
+
+
+def test_lookup_miss_embed_suggestions_and_hits():
+    hits = [
+        SearchHit(id="action:grab", name="Grab", category="action", excerpt="grab...",
+                  source_url="https://2e.aonprd.com/Grab"),
+        SearchHit(id="action:grapple", name="Grapple", category="action", excerpt="grapple...",
+                  source_url="https://2e.aonprd.com/Grapple"),
+    ]
+    e = lookup_miss_embed("Grabbing", ["Grab"], hits)
+    assert "Grabbing" in e.title
+    assert "Grab" in e.description
+    assert "Grapple" in e.description  # listed even if not a "did you mean"
+
+
+def test_lookup_miss_embed_no_hits():
+    e = lookup_miss_embed("Zxqwv", [], [])
+    assert "/search" in e.description

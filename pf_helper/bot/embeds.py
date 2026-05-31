@@ -57,6 +57,29 @@ def search_embeds(hits: list[SearchHit]) -> discord.Embed:
     )
 
 
+def lookup_miss_embed(
+    name: str, suggestions: list[str], hits: list[SearchHit]
+) -> discord.Embed:
+    """Embed for a /lookup exact-name miss: 'did you mean' + closest search hits."""
+    lines: list[str] = []
+    if suggestions:
+        lines.append("Did you mean: " + ", ".join(f"**{s}**" for s in suggestions) + "?")
+    if hits:
+        if lines:
+            lines.append("")
+        lines.append("Closest matches:")
+        lines += [
+            f"- [{h.name}]({h.source_url}) · {h.category} — {truncate(h.excerpt, 120)}"
+            for h in hits
+        ]
+    else:
+        lines.append("Nothing found. Try `/search`.")
+    return discord.Embed(
+        title=f"No exact match for '{name}'",
+        description=truncate("\n".join(lines), _DESC_LIMIT),
+    )
+
+
 def answer_embed(answer: Answer) -> discord.Embed:
     embed = discord.Embed(description=truncate(answer.text, _DESC_LIMIT - 200))
     if answer.sources:
@@ -64,6 +87,8 @@ def answer_embed(answer: Answer) -> discord.Embed:
         embed.add_field(
             name="Sources (Archives of Nethys)", value=truncate(links, _FIELD_LIMIT), inline=False
         )
-    if answer.engine:
+    if answer.engine == "cache" and answer.match_score is not None:
+        embed.set_footer(text=f"answered via cache · similar question ({answer.match_score:.2f})")
+    elif answer.engine:
         embed.set_footer(text=f"answered via {answer.engine}")
     return embed
