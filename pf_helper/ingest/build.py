@@ -68,9 +68,10 @@ def _ensure_aon_cache(cfg: Config, refresh: bool = False) -> None:
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310
-            data = json.loads(resp.read())
+            data = json.load(resp)
         docs = [hit["_source"] for hit in data["hits"]["hits"]]
-        path.write_text(json.dumps(docs), encoding="utf-8")
+        with path.open("w", encoding="utf-8") as f:
+            json.dump(docs, f)
         print(f"  fetched {category:18} {len(docs)}")
 
 
@@ -96,9 +97,10 @@ def _ensure_aon_link_cache(cfg: Config, refresh: bool = False) -> None:
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310
-            data = json.loads(resp.read())
+            data = json.load(resp)
         docs = [hit["_source"] for hit in data["hits"]["hits"]]
-        path.write_text(json.dumps(docs), encoding="utf-8")
+        with path.open("w", encoding="utf-8") as f:
+            json.dump(docs, f)
         print(f"  link-cached {category:12} {len(docs)}")
 
 

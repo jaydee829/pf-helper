@@ -57,7 +57,8 @@ def build_link_index(link_dir: str | Path) -> AonLinkIndex:
         if not path.exists():
             continue
         try:
-            docs = json.loads(path.read_text(encoding="utf-8"))
+            with path.open(encoding="utf-8") as f:
+                docs = json.load(f)
         except OSError:
             continue
         except ValueError:  # JSON / unicode decode errors
