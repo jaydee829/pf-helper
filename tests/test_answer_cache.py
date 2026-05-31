@@ -1,7 +1,8 @@
+import sqlite3
 import time
 
 from pf_helper.answer.base import Answer
-from pf_helper.answer.cache import AnswerCache, normalize_question
+from pf_helper.answer.cache import AnswerCache, _content_tokens, _jaccard, _stem, normalize_question
 
 
 def test_normalize_collides_phrasings():
@@ -56,3 +57,111 @@ def test_size_cap_evicts_oldest(tmp_path):
     assert rows == 3
     assert cache.get("q0") is None  # oldest evicted
     assert cache.get("q4") is not None  # newest kept
+
+
+def test_stem_is_crude_but_consistent():
+    assert _stem("flanking") == "flank"
+    assert _stem("flanked") == "flank"  # -ed branch
+    assert _stem("flank") == "flank"
+    assert _stem("creatures") == "creature"  # -s branch
+    assert _stem("is") == "is"  # short tokens untouched
+
+
+def test_content_tokens_drop_stopwords_and_framing():
+    assert _content_tokens("How does flanking work?") == {"flank"}
+    assert _content_tokens("When am I flanking again?") == {"flank"}
+    assert _content_tokens("What is flanking?") == {"flank"}
+    assert _content_tokens("What are the rules for flanking?") == {"flank"}
+
+
+def test_content_tokens_keep_salient_nouns():
+    assert _content_tokens("can tiny creatures flank") == {"tiny", "creature", "flank"}
+
+
+def test_jaccard():
+    assert _jaccard({"flank"}, {"flank"}) == 1.0
+    assert _jaccard({"flank", "tiny", "creature"}, {"flank"}) == 1 / 3
+    assert _jaccard(set(), set()) == 0.0
+
+
+def test_put_populates_tokens(tmp_path):
+    cache, _ = _cache(tmp_path)
+    cache.put("How does flanking work?", Answer("t", [("n", "u")], "agent"))
+    row = cache._conn.execute("SELECT tokens FROM answers").fetchone()
+    assert row["tokens"] == "flank"
+
+
+def test_migration_recreates_tokenless_table(tmp_path):
+    db = tmp_path / "ask_cache.db"
+    index = tmp_path / "pf2e.db"
+    index.write_text("v1")
+    # simulate an old cache DB without the tokens column
+    old = sqlite3.connect(db)
+    old.execute(
+        "CREATE TABLE answers (norm TEXT PRIMARY KEY, text TEXT NOT NULL, "
+        "sources_json TEXT NOT NULL, index_version TEXT NOT NULL, created_at REAL NOT NULL)"
+    )
+    old.execute("INSERT INTO answers VALUES ('old', 't', '[]', 'v', 0)")
+    old.commit()
+    old.close()
+    cache = AnswerCache(db, index)  # should not raise
+    cols = {r[1] for r in cache._conn.execute("PRAGMA table_info(answers)").fetchall()}
+    assert "tokens" in cols
+    assert cache._conn.execute("SELECT COUNT(*) FROM answers").fetchone()[0] == 0  # recreated
+
+
+def test_fuzzy_hits_paraphrases(tmp_path):
+    cache, _ = _cache(tmp_path)
+    cache.put("How does flanking work?", Answer("Flank text", [("Flanking", "u")], "agent"))
+    for q in ["When am I flanking again?", "What is flanking?", "What are the rules for flanking?"]:
+        hit = cache.get(q)
+        assert hit is not None, q
+        assert hit.text == "Flank text"
+        assert hit.engine == "cache"
+        assert hit.match_score is not None and hit.match_score >= 0.5
+        assert hit.matched_question == "how does flanking work"
+
+
+def test_fuzzy_misses_distinct_question(tmp_path):
+    cache, _ = _cache(tmp_path)
+    cache.put("What is flanking?", Answer("Flank text", [("Flanking", "u")], "agent"))
+    assert cache.get("can tiny creatures flank?") is None  # jaccard 1/3 < 0.5
+
+
+def test_fuzzy_disabled_per_call(tmp_path):
+    cache, _ = _cache(tmp_path)
+    cache.put("How does flanking work?", Answer("Flank text", [("Flanking", "u")], "agent"))
+    assert cache.get("what is flanking?", fuzzy=False) is None  # exact-only
+    assert cache.get("how does flanking work", fuzzy=False) is not None  # exact still hits
+
+
+def test_similarity_zero_disables_fuzzy(tmp_path):
+    index = tmp_path / "pf2e.db"
+    index.write_text("v1")
+    cache = AnswerCache(tmp_path / "ask_cache.db", index, similarity=0.0)
+    cache.put("How does flanking work?", Answer("t", [("n", "u")], "agent"))
+    assert cache.get("what is flanking?") is None
+
+
+def test_fuzzy_skips_stale_rows(tmp_path):
+    cache, index = _cache(tmp_path)
+    cache.put("How does flanking work?", Answer("t", [("n", "u")], "agent"))
+    index.write_text("v2-bigger-changed")  # bust index_version
+    assert cache.get("what is flanking?") is None
+
+
+def test_fuzzy_skips_empty_token_question(tmp_path):
+    cache, _ = _cache(tmp_path)
+    cache.put("How does flanking work?", Answer("t", [("n", "u")], "agent"))
+    assert cache.get("what is it?") is None  # all stopwords -> no tokens -> no match
+
+
+def test_fuzzy_tie_break_prefers_newest(tmp_path):
+    cache, _ = _cache(tmp_path)
+    # two rows with identical tokens (-> identical Jaccard score) for the query
+    cache.put("What is flanking?", Answer("older", [("n", "u")], "agent"))
+    time.sleep(0.01)
+    cache.put("How does flanking work?", Answer("newer", [("n", "u")], "agent"))
+    hit = cache.get("flanking rules")  # tokens {flank}; ties against both rows
+    assert hit is not None
+    assert hit.text == "newer"  # most recent equal-scoring row wins

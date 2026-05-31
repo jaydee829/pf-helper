@@ -5,20 +5,31 @@ from pf_helper.answer import Answer, AnswerConfig, AnswerError
 from pf_helper.answer.service import ask
 
 
+@pytest.fixture(autouse=True)
+def _no_query_log(monkeypatch):
+    monkeypatch.setenv("PF_HELPER_ASK_QUERY_LOG", "0")
+
+
 def test_answer_defaults():
     a = Answer(text="hi")
     assert a.sources == []
     assert a.engine == ""
+    assert a.match_score is None
+    assert a.matched_question is None
 
 
 def test_answer_config_from_env(monkeypatch):
     monkeypatch.setenv("PF_HELPER_ASK_ENGINE", "B")
     monkeypatch.setenv("PF_HELPER_ASK_CACHE", "0")
     monkeypatch.setenv("PF_HELPER_ASK_CACHE_TTL_DAYS", "7")
+    monkeypatch.setenv("PF_HELPER_ASK_CACHE_SIMILARITY", "0.7")
+    monkeypatch.setenv("PF_HELPER_ASK_QUERY_LOG", "0")
     cfg = AnswerConfig.from_env()
     assert cfg.engine == "b"  # lower-cased
     assert cfg.cache_enabled is False
     assert cfg.cache_ttl_days == 7
+    assert cfg.cache_similarity == 0.7
+    assert cfg.query_log_enabled is False
     assert cfg.core.db_path.name == "pf2e.db"
 
 
@@ -44,8 +55,10 @@ class FakeCache:
     def __init__(self, hit=None):
         self.hit = hit
         self.put_calls = []
+        self.got_fuzzy = None
 
-    def get(self, q):
+    def get(self, q, *, fuzzy=True):
+        self.got_fuzzy = fuzzy
         return self.hit
 
     def put(self, q, a):
@@ -102,3 +115,56 @@ async def test_unsourced_answer_not_cached():
     cache = FakeCache()
     await ask("q", cache=cache, engine_a=a, engine_b=FakeEngine())
     assert cache.put_calls == []
+
+
+@pytest.mark.asyncio
+async def test_fresh_bypasses_cache_read():
+    a = FakeEngine(Answer("fresh-ans", [("n", "u")], "agent"))
+    cache = FakeCache(hit=Answer("cached", [("n", "u")], "cache"))
+    out = await ask("q", cache=cache, engine_a=a, engine_b=FakeEngine(), fresh=True)
+    assert out.text == "fresh-ans"  # cached hit ignored
+    assert a.calls == 1
+    assert cache.put_calls and cache.put_calls[0][1].text == "fresh-ans"  # still written
+
+
+@pytest.mark.asyncio
+async def test_fuzzy_flag_threaded_to_cache():
+    cache = FakeCache(hit=None)
+    await ask("q", cache=cache, engine_a=FakeEngine(Answer("x", [("n", "u")], "agent")),
+              engine_b=FakeEngine(), fuzzy=False)
+    assert cache.got_fuzzy is False
+
+
+@pytest.mark.asyncio
+async def test_query_logger_records_served_by():
+    recs = []
+    a = FakeEngine(Answer("A-ans", [("n", "u")], "agent"))
+    await ask("q", cache=FakeCache(), engine_a=a, engine_b=FakeEngine(), query_logger=recs.append)
+    assert recs and recs[0]["served_by"] == "agent"
+    assert recs[0]["fuzzy"] is True and recs[0]["fresh"] is False
+
+
+@pytest.mark.asyncio
+async def test_query_logger_records_cache_and_auth():
+    recs = []
+    cache = FakeCache(hit=Answer("cached", [("n", "u")], "cache"))
+    await ask("q", cache=cache, engine_a=FakeEngine(), engine_b=FakeEngine(),
+              query_logger=recs.append)
+    assert recs[-1]["served_by"] == "cache"
+    recs.clear()
+    a = FakeEngine(exc=CLINotFoundError("nope"))
+    with pytest.raises(AnswerError):
+        await ask("q", cache=FakeCache(), engine_a=a, engine_b=FakeEngine(),
+                  query_logger=recs.append)
+    assert recs[-1]["served_by"] == "error:auth"
+
+
+@pytest.mark.asyncio
+async def test_engine_fallback_logs_once_not_per_engine():
+    # engine A fails with ClaudeSDKError (continue, no log), B succeeds -> exactly one log
+    recs = []
+    a = FakeEngine(exc=ClaudeSDKError("rate limit"))
+    b = FakeEngine(Answer("B-ans", [("n", "u")], "rag"))
+    out = await ask("q", cache=FakeCache(), engine_a=a, engine_b=b, query_logger=recs.append)
+    assert out.text == "B-ans"
+    assert len(recs) == 1 and recs[0]["served_by"] == "rag"
