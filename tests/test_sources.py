@@ -96,3 +96,25 @@ def test_aon_source_url_tolerates_missing_leading_slash(tmp_path):
     )
     entry = next(iter(AonSource(tmp_path).iter_entries()))
     assert entry.source_url == "https://2e.aonprd.com/Traits.aspx?ID=9"
+
+
+class _FakeLinkIndex:
+    def __init__(self, mapping):
+        self._m = mapping  # {(category, name): url}
+
+    def url_for(self, category, name):
+        return self._m.get((category, name))
+
+
+def test_foundry_uses_exact_link_when_index_matches():
+    idx = _FakeLinkIndex({("feat", "Test Feat"): "https://2e.aonprd.com/Feats.aspx?ID=99"})
+    src = FoundrySource(FIXTURE_ROOT, link_index=idx)
+    feat = next(e for e in src.iter_entries() if e.name == "Test Feat")
+    assert feat.source_url == "https://2e.aonprd.com/Feats.aspx?ID=99"
+
+
+def test_foundry_falls_back_to_search_link_when_index_misses():
+    idx = _FakeLinkIndex({})  # knows nothing
+    src = FoundrySource(FIXTURE_ROOT, link_index=idx)
+    cond = next(e for e in src.iter_entries() if e.name == "Frightened")
+    assert cond.source_url == "https://2e.aonprd.com/Search.aspx?q=Frightened"

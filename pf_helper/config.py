@@ -25,6 +25,10 @@ class Config:
         return self.data_dir / "aon"
 
     @property
+    def aon_links_dir(self) -> Path:
+        return self.data_dir / "aon_links"
+
+    @property
     def foundry_dir(self) -> Path:
         return self.data_dir / "foundry-pf2e"
 
