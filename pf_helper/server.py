@@ -56,7 +56,9 @@ def search(query: str, category: Category | None = None, limit: int = 10) -> lis
     """Search Pathfinder 2e rules. Returns lean ranked hits (name, category,
     level, excerpt, id). Use `category` to scope; call `get_entry` for full text.
     Returns an empty list if the index has not been built yet (run the
-    `pf-helper-ingest` command to populate it)."""
+    `pf-helper-ingest` command to populate it).
+    Each hit includes a `source_url` (its Archives of Nethys / AON page) — cite
+    it when you answer."""
     r = _get_retriever()
     if r is None:
         return []
@@ -67,7 +69,9 @@ def search(query: str, category: Category | None = None, limit: int = 10) -> lis
 @mcp.tool()
 def get_entry(name: str, category: Category | None = None) -> EntryDetail | None:
     """Fetch the full cleaned text of one PF2e entry by exact name (optionally
-    scoped by category). Returns None if not found."""
+    scoped by category). Returns None if not found.
+    The result includes a `source_url` (its Archives of Nethys / AON page); cite
+    it when you answer."""
     r = _get_retriever()
     if r is None:
         return None
