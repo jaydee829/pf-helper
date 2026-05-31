@@ -58,7 +58,9 @@ def build_link_index(link_dir: str | Path) -> AonLinkIndex:
             continue
         try:
             docs = json.loads(path.read_text(encoding="utf-8"))
-        except OSError, ValueError:
+        except OSError:
+            continue
+        except ValueError:  # JSON / unicode decode errors
             continue
         if not isinstance(docs, list):
             continue
