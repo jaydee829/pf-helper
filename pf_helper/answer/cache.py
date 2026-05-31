@@ -80,18 +80,24 @@ class AnswerCache:
         index_db_path: str | Path,
         ttl_days: int = 30,
         max_rows: int = 500,
+        similarity: float = 0.5,
     ):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.index_db_path = Path(index_db_path)
         self.ttl_seconds = ttl_days * 86400
         self.max_rows = max_rows
+        self.similarity = similarity
         self._conn = sqlite3.connect(self.path)
         self._conn.row_factory = sqlite3.Row
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(answers)").fetchall()}
+        if cols and "tokens" not in cols:
+            self._conn.execute("DROP TABLE answers")  # disposable cache; recreate cleanly
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS answers ("
             "norm TEXT PRIMARY KEY, text TEXT NOT NULL, sources_json TEXT NOT NULL, "
-            "index_version TEXT NOT NULL, created_at REAL NOT NULL)"
+            "index_version TEXT NOT NULL, created_at REAL NOT NULL, "
+            "tokens TEXT NOT NULL DEFAULT '')"
         )
         self._conn.commit()
 
@@ -111,15 +117,18 @@ class AnswerCache:
 
     def put(self, question: str, answer: Answer) -> None:
         norm = normalize_question(question)
+        tokens = " ".join(sorted(_content_tokens(question)))
         self._conn.execute(
-            "INSERT OR REPLACE INTO answers (norm, text, sources_json, index_version, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO answers "
+            "(norm, text, sources_json, index_version, created_at, tokens) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
             (
                 norm,
                 answer.text,
                 json.dumps([list(s) for s in answer.sources]),
                 index_version(self.index_db_path),
                 time.time(),
+                tokens,
             ),
         )
         self._conn.execute(

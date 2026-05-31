@@ -1,3 +1,4 @@
+import sqlite3
 import time
 
 from pf_helper.answer.base import Answer
@@ -81,3 +82,29 @@ def test_jaccard():
     assert _jaccard({"flank"}, {"flank"}) == 1.0
     assert _jaccard({"flank", "tiny", "creature"}, {"flank"}) == 1 / 3
     assert _jaccard(set(), set()) == 0.0
+
+
+def test_put_populates_tokens(tmp_path):
+    cache, _ = _cache(tmp_path)
+    cache.put("How does flanking work?", Answer("t", [("n", "u")], "agent"))
+    row = cache._conn.execute("SELECT tokens FROM answers").fetchone()
+    assert row["tokens"] == "flank"
+
+
+def test_migration_recreates_tokenless_table(tmp_path):
+    db = tmp_path / "ask_cache.db"
+    index = tmp_path / "pf2e.db"
+    index.write_text("v1")
+    # simulate an old cache DB without the tokens column
+    old = sqlite3.connect(db)
+    old.execute(
+        "CREATE TABLE answers (norm TEXT PRIMARY KEY, text TEXT NOT NULL, "
+        "sources_json TEXT NOT NULL, index_version TEXT NOT NULL, created_at REAL NOT NULL)"
+    )
+    old.execute("INSERT INTO answers VALUES ('old', 't', '[]', 'v', 0)")
+    old.commit()
+    old.close()
+    cache = AnswerCache(db, index)  # should not raise
+    cols = {r[1] for r in cache._conn.execute("PRAGMA table_info(answers)").fetchall()}
+    assert "tokens" in cols
+    assert cache._conn.execute("SELECT COUNT(*) FROM answers").fetchone()[0] == 0  # recreated
