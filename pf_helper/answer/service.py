@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import logging
 
-from claude_agent_sdk import ClaudeSDKError, CLINotFoundError
-
 from pf_helper.answer.base import Answer, Answerer, AnswerError
 from pf_helper.answer.cache import AnswerCache
 from pf_helper.answer.config import AnswerConfig
@@ -29,6 +27,11 @@ async def ask(
     Dependencies are injectable for testing; defaults are built from cfg.
     """
     cfg = cfg or AnswerConfig.from_env()
+
+    # Imported here, not at module load, so pf_helper.answer's core types
+    # (Answer/AnswerConfig/AnswerError) stay importable without the optional
+    # claude-agent-sdk dependency. ask() itself needs the SDK.
+    from claude_agent_sdk import ClaudeSDKError, CLINotFoundError
 
     if engine_a is None or engine_b is None:
         from pf_helper.answer.engines import AgentMcpAnswerer, ContextRagAnswerer

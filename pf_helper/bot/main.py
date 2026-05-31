@@ -11,11 +11,18 @@ from discord.ext import commands
 from pf_helper.answer import AnswerError, ask
 from pf_helper.answer.config import AnswerConfig
 from pf_helper.bot.config import BotConfig
-from pf_helper.bot.embeds import answer_embed, lookup_embed, search_embeds, split_message
+from pf_helper.bot.embeds import answer_embed, lookup_embed, search_embeds
+from pf_helper.models import Category
 from pf_helper.retrieval.factory import build_retriever
 
 _log = logging.getLogger(__name__)
 _NO_INDEX = "Rules index not found — run `pf-helper-ingest` first."
+_VALID_CATEGORIES = frozenset(c.value for c in Category)
+
+
+def _category_filter(category: str | None) -> str | None:
+    """Pass through a known category; treat anything else (incl. None) as no filter."""
+    return category if category in _VALID_CATEGORIES else None
 
 
 def build_bot(bot_cfg: BotConfig, answer_cfg: AnswerConfig) -> commands.Bot:
@@ -43,7 +50,7 @@ def build_bot(bot_cfg: BotConfig, answer_cfg: AnswerConfig) -> commands.Bot:
         if r is None:
             await interaction.response.send_message(_NO_INDEX, ephemeral=True)
             return
-        detail = r.get(name, category=category or None)
+        detail = r.get(name, category=_category_filter(category))
         if detail is None:
             await interaction.response.send_message(
                 f"No exact match for '{name}'. Try `/search`.", ephemeral=True
@@ -58,7 +65,7 @@ def build_bot(bot_cfg: BotConfig, answer_cfg: AnswerConfig) -> commands.Bot:
         if r is None:
             await interaction.response.send_message(_NO_INDEX, ephemeral=True)
             return
-        hits = r.search(query, category=category or None, limit=6)
+        hits = r.search(query, category=_category_filter(category), limit=6)
         await interaction.response.send_message(embed=search_embeds(hits))
 
     @bot.tree.command(name="ask", description="Ask a PF2e rules question (uses Claude).")
@@ -74,10 +81,9 @@ def build_bot(bot_cfg: BotConfig, answer_cfg: AnswerConfig) -> commands.Bot:
             _log.exception("ask failed")
             await interaction.followup.send("Something went wrong answering that.")
             return
-        chunks = split_message(answer.text)
+        # A concise Discord answer fits the embed (≤4096 chars); the embed
+        # truncates with the AON Sources links if it ever runs long.
         await interaction.followup.send(embed=answer_embed(answer))
-        for extra in chunks[1:]:
-            await interaction.followup.send(extra)
 
     return bot
 
