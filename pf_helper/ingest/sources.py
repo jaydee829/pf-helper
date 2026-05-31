@@ -7,7 +7,11 @@ import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import quote_plus
+
+if TYPE_CHECKING:
+    from pf_helper.ingest.aon_links import AonLinkIndex
 
 from pf_helper.ingest.aon_clean import clean_aon
 from pf_helper.ingest.clean import clean_text
@@ -86,9 +90,10 @@ class Source(ABC):
 class FoundrySource(Source):
     """Walks `<root>/pf2e/<pack>/**/*.json` and yields cleaned Entries."""
 
-    def __init__(self, root: str | Path):
+    def __init__(self, root: str | Path, link_index: AonLinkIndex | None = None):
         # root is the directory that contains the `pf2e/` packs tree.
         self.packs_root = Path(root) / "pf2e"
+        self._link_index = link_index
 
     def iter_entries(self) -> Iterator[Entry]:
         for path in sorted(self.packs_root.rglob("*.json")):
@@ -113,6 +118,9 @@ class FoundrySource(Source):
             return None
         system = doc.get("system", {})
         html = (system.get("description") or {}).get("value", "")
+        name = doc["name"]
+        exact = self._link_index.url_for(category, name) if self._link_index else None
+        source_url = exact or f"https://2e.aonprd.com/Search.aspx?q={quote_plus(name)}"
         return Entry(
             # Human-readable slug plus the Foundry _id, which is unique within the
             # compendium. The _id suffix prevents same-name/same-category documents
@@ -127,7 +135,7 @@ class FoundrySource(Source):
             text=clean_text(html),
             raw_json=json.dumps(doc, separators=(",", ":")),
             stats=extract_stats(category, system),
-            source_url=f"https://2e.aonprd.com/Search.aspx?q={quote_plus(doc['name'])}",
+            source_url=source_url,
         )
 
 
