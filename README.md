@@ -110,3 +110,47 @@ Re-run `uv run pf-helper-ingest` to pull the latest Foundry data and rebuild.
   `Retriever` interface (`pf_helper/retrieval/`) serves it; `pf_helper/server.py`
   exposes `search` and `get_entry` as MCP tools. See
   `docs/superpowers/specs/` for the full design.
+
+## Discord bot (optional)
+
+A Discord front-end with `/lookup`, `/search` (instant, local, no LLM), and
+`/ask` (natural-language, powered by the Claude Agent SDK on your Claude
+subscription — no API key). `/ask` answers are grounded in the index and cite
+Archives of Nethys links; frequently-asked questions are cached.
+
+### Install
+```bash
+uv sync --extra bot
+```
+
+### Prerequisites
+- Build the index: `uv run pf-helper-ingest`.
+- For `/ask`, authenticate Claude (uses your subscription, not an API key):
+  `claude login` on a dev machine, or for a host run `claude setup-token` and
+  export the resulting `CLAUDE_CODE_OAUTH_TOKEN`.
+- A Discord bot token: Discord Developer Portal → your application → Bot → Reset
+  Token. Invite the bot with OAuth2 scopes `bot` + `applications.commands`.
+
+### Configure (environment variables)
+| Var | Required | Purpose |
+|---|---|---|
+| `DISCORD_BOT_TOKEN` | yes | Discord bot auth |
+| `PF_HELPER_DISCORD_GUILD_ID` | no | register slash commands to one guild instantly (else global, ~1h to appear) |
+| `PF_HELPER_DATA_DIR` | no | index location (default: repo `data/`) |
+| `CLAUDE_CODE_OAUTH_TOKEN` | host only | subscription auth without interactive login |
+| `PF_HELPER_ASK_ENGINE` | no | `auto` (default; agentic, falls back to single-shot) / `a` / `b` |
+| `PF_HELPER_ASK_CACHE` | no | `1`/`0` — enable the /ask answer cache (default on) |
+
+### Run
+```bash
+uv run pf-helper-bot
+```
+Then in your server: `/lookup Frightened`, `/search status penalty`,
+`/ask How does flanking work?`. `/lookup` and `/search` never use your Claude
+quota; `/ask` does (and degrades to suggesting `/lookup`·`/search` if Claude is
+rate-limited).
+
+### Notes
+- Runs the same on your PC or an always-on host — only the environment differs.
+- `/ask` needs Claude signed in; without it, `/ask` replies with a setup hint
+  while `/lookup`·`/search` keep working.
