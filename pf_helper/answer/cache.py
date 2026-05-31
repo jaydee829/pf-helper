@@ -118,8 +118,10 @@ class AnswerCache:
         cutoff = time.time() - self.ttl_seconds
         best_row = None
         best_score = 0.0
+        # newest first, so the strict `>` below keeps the most recent row on ties
         for r in self._conn.execute(
-            "SELECT * FROM answers WHERE index_version = ? AND created_at > ?",
+            "SELECT * FROM answers WHERE index_version = ? AND created_at > ? "
+            "ORDER BY created_at DESC",
             (current, cutoff),
         ):
             score = _jaccard(qtokens, frozenset(r["tokens"].split()))
@@ -138,6 +140,7 @@ class AnswerCache:
         return not (stale or expired)
 
     def _to_answer(self, row: sqlite3.Row) -> Answer:
+        """Construct a cache Answer from a DB row (match fields set by the caller)."""
         sources = [tuple(s) for s in json.loads(row["sources_json"])]
         return Answer(text=row["text"], sources=sources, engine="cache")
 

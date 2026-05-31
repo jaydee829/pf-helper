@@ -154,3 +154,14 @@ def test_fuzzy_skips_empty_token_question(tmp_path):
     cache, _ = _cache(tmp_path)
     cache.put("How does flanking work?", Answer("t", [("n", "u")], "agent"))
     assert cache.get("what is it?") is None  # all stopwords -> no tokens -> no match
+
+
+def test_fuzzy_tie_break_prefers_newest(tmp_path):
+    cache, _ = _cache(tmp_path)
+    # two rows with identical tokens (-> identical Jaccard score) for the query
+    cache.put("What is flanking?", Answer("older", [("n", "u")], "agent"))
+    time.sleep(0.01)
+    cache.put("How does flanking work?", Answer("newer", [("n", "u")], "agent"))
+    hit = cache.get("flanking rules")  # tokens {flank}; ties against both rows
+    assert hit is not None
+    assert hit.text == "newer"  # most recent equal-scoring row wins
