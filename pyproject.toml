@@ -36,6 +36,7 @@ dev = [
     "pytest",
     "discord-py>=2.7.1",
     "claude-agent-sdk>=0.2.87",
+    "pytest-asyncio>=1.4.0",
 ]
 
 [tool.ruff]
@@ -47,3 +48,4 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
