@@ -60,8 +60,9 @@ def test_size_cap_evicts_oldest(tmp_path):
 
 def test_stem_is_crude_but_consistent():
     assert _stem("flanking") == "flank"
+    assert _stem("flanked") == "flank"  # -ed branch
     assert _stem("flank") == "flank"
-    assert _stem("creatures") == _stem("creatures")  # deterministic
+    assert _stem("creatures") == "creature"  # -s branch
     assert _stem("is") == "is"  # short tokens untouched
 
 

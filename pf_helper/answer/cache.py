@@ -21,17 +21,22 @@ _TOKEN_SPLIT = re.compile(r"[^a-z0-9]+")
 # Function words + rules-question framing words. The framing words are the main
 # tuning lever: they collapse keyword-dominated paraphrases to the same token.
 _STOPWORDS: frozenset[str] = frozenset(
-    # function words
-    "a am an and are as at be by can could do does did for from how i if in into "
-    "is it me my of on or should that the their them then there this to use what "
-    "when where which who why will with would you your "
-    # rules-question framing words
-    "again happen happens mean means rule rules work works explain tell about".split()
+    (
+        # function words
+        "a am an and are as at be by can could do does did for from how i if in into "
+        "is it me my of on or should that the their them then there this to use what "
+        "when where which who why will with would you your "
+        # rules-question framing words
+        "again happen happens mean means rule rules work works explain tell about"
+    ).split()
 )
 
 
 def _stem(w: str) -> str:
-    """Deliberately crude suffix stripping; only needs to be consistent."""
+    """Deliberately crude suffix stripping; only needs to be consistent.
+
+    Length guards keep a >=2-3 char stem so short words aren't mangled.
+    """
     if len(w) > 5 and w.endswith("ing"):
         return w[:-3]
     if len(w) > 4 and w.endswith("ed"):
@@ -48,6 +53,7 @@ def _content_tokens(question: str) -> frozenset[str]:
 
 
 def _jaccard(a: frozenset[str] | set[str], b: frozenset[str] | set[str]) -> float:
+    """Jaccard similarity of two token sets (0.0 when both are empty)."""
     union = a | b
     return len(a & b) / len(union) if union else 0.0
 
