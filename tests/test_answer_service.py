@@ -157,3 +157,14 @@ async def test_query_logger_records_cache_and_auth():
         await ask("q", cache=FakeCache(), engine_a=a, engine_b=FakeEngine(),
                   query_logger=recs.append)
     assert recs[-1]["served_by"] == "error:auth"
+
+
+@pytest.mark.asyncio
+async def test_engine_fallback_logs_once_not_per_engine():
+    # engine A fails with ClaudeSDKError (continue, no log), B succeeds -> exactly one log
+    recs = []
+    a = FakeEngine(exc=ClaudeSDKError("rate limit"))
+    b = FakeEngine(Answer("B-ans", [("n", "u")], "rag"))
+    out = await ask("q", cache=FakeCache(), engine_a=a, engine_b=b, query_logger=recs.append)
+    assert out.text == "B-ans"
+    assert len(recs) == 1 and recs[0]["served_by"] == "rag"
