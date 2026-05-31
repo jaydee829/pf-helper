@@ -16,6 +16,40 @@ from pf_helper.answer.base import Answer
 
 _WS = re.compile(r"\s+")
 _EDGE_PUNCT = re.compile(r"^\W+|\W+$")  # \W is non-word; strips leading/trailing punctuation
+_TOKEN_SPLIT = re.compile(r"[^a-z0-9]+")
+
+# Function words + rules-question framing words. The framing words are the main
+# tuning lever: they collapse keyword-dominated paraphrases to the same token.
+_STOPWORDS: frozenset[str] = frozenset(
+    # function words
+    "a am an and are as at be by can could do does did for from how i if in into "
+    "is it me my of on or should that the their them then there this to use what "
+    "when where which who why will with would you your "
+    # rules-question framing words
+    "again happen happens mean means rule rules work works explain tell about".split()
+)
+
+
+def _stem(w: str) -> str:
+    """Deliberately crude suffix stripping; only needs to be consistent."""
+    if len(w) > 5 and w.endswith("ing"):
+        return w[:-3]
+    if len(w) > 4 and w.endswith("ed"):
+        return w[:-2]
+    if len(w) > 3 and w.endswith("s") and not w.endswith("ss"):
+        return w[:-1]
+    return w
+
+
+def _content_tokens(question: str) -> frozenset[str]:
+    """Salient stemmed content tokens (stopwords + framing words removed)."""
+    raw = _TOKEN_SPLIT.split(question.lower())
+    return frozenset(_stem(t) for t in raw if t and t not in _STOPWORDS)
+
+
+def _jaccard(a: frozenset[str] | set[str], b: frozenset[str] | set[str]) -> float:
+    union = a | b
+    return len(a & b) / len(union) if union else 0.0
 
 
 def normalize_question(question: str) -> str:

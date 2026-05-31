@@ -1,7 +1,7 @@
 import time
 
 from pf_helper.answer.base import Answer
-from pf_helper.answer.cache import AnswerCache, normalize_question
+from pf_helper.answer.cache import AnswerCache, _content_tokens, _jaccard, _stem, normalize_question
 
 
 def test_normalize_collides_phrasings():
@@ -56,3 +56,27 @@ def test_size_cap_evicts_oldest(tmp_path):
     assert rows == 3
     assert cache.get("q0") is None  # oldest evicted
     assert cache.get("q4") is not None  # newest kept
+
+
+def test_stem_is_crude_but_consistent():
+    assert _stem("flanking") == "flank"
+    assert _stem("flank") == "flank"
+    assert _stem("creatures") == _stem("creatures")  # deterministic
+    assert _stem("is") == "is"  # short tokens untouched
+
+
+def test_content_tokens_drop_stopwords_and_framing():
+    assert _content_tokens("How does flanking work?") == {"flank"}
+    assert _content_tokens("When am I flanking again?") == {"flank"}
+    assert _content_tokens("What is flanking?") == {"flank"}
+    assert _content_tokens("What are the rules for flanking?") == {"flank"}
+
+
+def test_content_tokens_keep_salient_nouns():
+    assert _content_tokens("can tiny creatures flank") == {"tiny", "creature", "flank"}
+
+
+def test_jaccard():
+    assert _jaccard({"flank"}, {"flank"}) == 1.0
+    assert _jaccard({"flank", "tiny", "creature"}, {"flank"}) == 1 / 3
+    assert _jaccard(set(), set()) == 0.0
