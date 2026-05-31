@@ -10,6 +10,7 @@ from pf_helper.bot.embeds import (
     split_message,
     truncate,
 )
+from pf_helper.bot.main import _close_names
 from pf_helper.models import EntryDetail, SearchHit
 
 
@@ -106,3 +107,12 @@ def test_lookup_miss_embed_suggestions_and_hits():
 def test_lookup_miss_embed_no_hits():
     e = lookup_miss_embed("Zxqwv", [], [])
     assert "/search" in e.description
+
+
+def test_close_names_picks_very_close_only():
+    names = ["Grab", "Grapple", "Trip"]
+    assert _close_names("Grabbing", names) == ["Grab"]  # Grapple/Trip below cutoff
+
+
+def test_close_names_empty_when_nothing_close():
+    assert _close_names("Zxqwv", ["Grab", "Trip"]) == []

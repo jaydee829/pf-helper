@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import logging
 
 import discord
@@ -11,13 +12,23 @@ from discord.ext import commands
 from pf_helper.answer import AnswerError, ask
 from pf_helper.answer.config import AnswerConfig
 from pf_helper.bot.config import BotConfig
-from pf_helper.bot.embeds import answer_embed, lookup_embed, search_embeds
+from pf_helper.bot.embeds import answer_embed, lookup_embed, lookup_miss_embed, search_embeds
 from pf_helper.models import Category
 from pf_helper.retrieval.factory import build_retriever
 
 _log = logging.getLogger(__name__)
 _NO_INDEX = "Rules index not found — run `pf-helper-ingest` first."
 _VALID_CATEGORIES = frozenset(c.value for c in Category)
+_SUGGEST_CUTOFF = 0.6  # difflib ratio for a "did you mean" suggestion (very close only)
+
+
+def _close_names(
+    query: str, names: list[str], *, cutoff: float = _SUGGEST_CUTOFF, n: int = 3
+) -> list[str]:
+    """Names that are a very close match to query (case-insensitive), original-cased."""
+    lowered = [nm.lower() for nm in names]
+    matches = difflib.get_close_matches(query.lower(), lowered, n=n, cutoff=cutoff)
+    return [names[lowered.index(m)] for m in matches]
 
 
 def _category_filter(category: str | None) -> str | None:
@@ -52,8 +63,10 @@ def build_bot(bot_cfg: BotConfig, answer_cfg: AnswerConfig) -> commands.Bot:
             return
         detail = r.get(name, category=_category_filter(category))
         if detail is None:
+            hits = r.search(name, category=_category_filter(category), limit=6)
+            suggestions = _close_names(name, [h.name for h in hits])
             await interaction.response.send_message(
-                f"No exact match for '{name}'. Try `/search`.", ephemeral=True
+                embed=lookup_miss_embed(name, suggestions, hits), ephemeral=True
             )
             return
         await interaction.response.send_message(embed=lookup_embed(detail))
@@ -69,11 +82,20 @@ def build_bot(bot_cfg: BotConfig, answer_cfg: AnswerConfig) -> commands.Bot:
         await interaction.response.send_message(embed=search_embeds(hits))
 
     @bot.tree.command(name="ask", description="Ask a PF2e rules question (uses Claude).")
-    @app_commands.describe(question="Your rules question")
-    async def ask_cmd(interaction: discord.Interaction, question: str):
+    @app_commands.describe(
+        question="Your rules question",
+        fuzzy="Reuse a cached answer to a similar question (default: on)",
+        fresh="Ignore the cache and ask Claude fresh (default: off)",
+    )
+    async def ask_cmd(
+        interaction: discord.Interaction,
+        question: str,
+        fuzzy: bool = True,
+        fresh: bool = False,
+    ):
         await interaction.response.defer(thinking=True)
         try:
-            answer = await ask(question, answer_cfg)
+            answer = await ask(question, answer_cfg, fuzzy=fuzzy, fresh=fresh)
         except AnswerError as e:
             await interaction.followup.send(str(e))
             return
@@ -81,8 +103,6 @@ def build_bot(bot_cfg: BotConfig, answer_cfg: AnswerConfig) -> commands.Bot:
             _log.exception("ask failed")
             await interaction.followup.send("Something went wrong answering that.")
             return
-        # A concise Discord answer fits the embed (≤4096 chars); the embed
-        # truncates with the AON Sources links if it ever runs long.
         await interaction.followup.send(embed=answer_embed(answer))
 
     return bot
