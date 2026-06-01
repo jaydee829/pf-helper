@@ -6,6 +6,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from pf_helper import userconfig
+
 _DEFAULT_DATA = Path(__file__).resolve().parent.parent / "data"
 
 
@@ -39,5 +41,7 @@ class Config:
 
     @classmethod
     def from_env(cls) -> Config:
-        data = os.environ.get("PF_HELPER_DATA_DIR")
-        return cls(data_dir=Path(data)) if data else cls()
+        file_cfg = userconfig.load_file_config()
+        data = os.environ.get("PF_HELPER_DATA_DIR") or file_cfg.get("data_dir")
+        data_dir = Path(data) if data else userconfig.data_dir_default()
+        return cls(data_dir=data_dir)
