@@ -800,10 +800,87 @@ git commit -m "feat: litellm optional extra + /ask provider docs"
 
 ---
 
+### Task 7: Opt-in live LiteLLM integration test
+
+**Files:**
+- Modify: `pyproject.toml` (register the `live` pytest marker)
+- Test: `tests/test_litellm_live.py` (new)
+
+This test exercises the real `litellm` against a real model to close the mock/reality gap (response shape, tool-call round-trip, real exception types). It is **off by default**: it skips unless `PF_HELPER_TEST_LITELLM_MODEL` is set, the real `litellm` is importable, and an index exists. So `uv run --no-sync pytest -q` stays fully offline/green.
+
+- [ ] **Step 1: Register the marker** — in `pyproject.toml`, add (create the section if absent; if `[tool.pytest.ini_options]` already exists, just add the `markers` key):
+
+```toml
+[tool.pytest.ini_options]
+markers = ["live: hits a real LLM provider; opt-in, requires PF_HELPER_TEST_LITELLM_MODEL"]
+```
+
+- [ ] **Step 2: Write the test** — create `tests/test_litellm_live.py`:
+
+```python
+"""Opt-in live LiteLLM smoke test. Skipped unless PF_HELPER_TEST_LITELLM_MODEL is set.
+
+Run it deliberately:  PF_HELPER_TEST_LITELLM_MODEL=ollama/llama3.1  uv run pytest -m live
+(local Ollama = free/no key; or set a hosted model + its API-key env var).
+"""
+
+import os
+
+import pytest
+
+pytestmark = pytest.mark.live
+
+_MODEL = os.environ.get("PF_HELPER_TEST_LITELLM_MODEL")
+
+
+@pytest.mark.skipif(not _MODEL, reason="set PF_HELPER_TEST_LITELLM_MODEL to run the live test")
+@pytest.mark.asyncio
+async def test_live_litellm_rag_and_agent():
+    pytest.importorskip("litellm")  # skip if the optional extra isn't installed
+    from pf_helper.answer.config import AnswerConfig
+    from pf_helper.answer.litellm_engines import LiteLlmAgentAnswerer, LiteLlmRagAnswerer
+    from pf_helper.retrieval.factory import build_retriever
+
+    cfg = AnswerConfig(
+        provider="litellm",
+        litellm_model=_MODEL,
+        litellm_api_base=os.environ.get("PF_HELPER_TEST_LITELLM_API_BASE"),
+    )
+    if not cfg.core.db_path.exists():
+        pytest.skip("no rules index built (run `pf-helper ingest`)")
+    retriever = build_retriever(cfg.core)
+
+    # RAG path: real response parses, non-empty answer, sources from retrieval.
+    rag = await LiteLlmRagAnswerer(retriever, cfg).answer("How does flanking work?")
+    assert rag.text.strip()
+    assert rag.sources
+
+    # Agentic path: the tool-loop round-trips with real litellm objects and the
+    # model drives the tools (needs a tool-capable model — that's the point of
+    # running this deliberately against your chosen model).
+    agent = await LiteLlmAgentAnswerer(retriever, cfg).answer("How does flanking work?")
+    assert agent.text.strip()
+    assert agent.sources  # >=1 source collected -> a tool was actually called
+```
+
+- [ ] **Step 3: Verify it skips by default** — `uv run --no-sync pytest tests/test_litellm_live.py -q` → expect **1 skipped** (env var unset). Confirm `uv run --no-sync pytest -q` still passes with this file present (the live test is skipped, not collected-and-failed). Then `uv run --no-sync ruff check tests/test_litellm_live.py`.
+
+- [ ] **Step 4: (Optional, manual) actually run it** — if you have Ollama running: `PF_HELPER_TEST_LITELLM_MODEL=ollama/llama3.1 uv run pytest -m live -q` (needs `uv sync --extra litellm` and a built index). Not required for the task to be complete — Step 3 is the gate.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add pyproject.toml tests/test_litellm_live.py
+git commit -m "test: opt-in live LiteLLM integration smoke test (env-gated)"
+```
+
+---
+
 ## Final verification (after all tasks)
 
 - [ ] `uv run --no-sync pytest -q` — full suite green.
 - [ ] `uv run --no-sync ruff check .` — clean.
 - [ ] `uv run --no-sync python -c "import pf_helper.answer.service; import pf_helper.answer.litellm_engines"` — imports clean WITHOUT the `litellm` extra installed (proves lazy import).
 - [ ] Default unchanged: with no `PF_HELPER_ASK_PROVIDER`/config, `AnswerConfig.from_env().provider == "claude-sdk"`.
+- [ ] The live test (`tests/test_litellm_live.py`) is **skipped** in a plain `pytest -q` run (env var unset) — never fails the gate. `pytest -m live` with `PF_HELPER_TEST_LITELLM_MODEL` set is the deliberate, manual path.
 - [ ] Open PR (do not merge); then retrieve + address Gemini review comments per the project workflow.
