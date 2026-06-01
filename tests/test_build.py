@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pf_helper.ingest.build as build_mod
 from pf_helper.config import Config
 from pf_helper.ingest.build import build_index
 from pf_helper.ingest.sources import AonSource, FoundrySource
@@ -44,3 +45,20 @@ def test_build_index_combines_foundry_and_aon(tmp_path):
     row = db.get_by_name(conn, "Aberration", category="trait")
     assert row is not None
     assert row["source_url"] == "https://2e.aonprd.com/Traits.aspx?ID=1"
+
+
+def test_ensure_index_builds_when_missing(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(build_mod, "run_ingest", lambda cfg, refresh=False: calls.append(cfg))
+    cfg = Config(data_dir=tmp_path)  # no pf2e.db present
+    build_mod.ensure_index(cfg)
+    assert calls == [cfg]
+
+
+def test_ensure_index_skips_when_present(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(build_mod, "run_ingest", lambda cfg, refresh=False: calls.append(cfg))
+    cfg = Config(data_dir=tmp_path)
+    cfg.db_path.write_text("db")  # index already there
+    build_mod.ensure_index(cfg)
+    assert calls == []

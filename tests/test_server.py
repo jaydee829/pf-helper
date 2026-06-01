@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+
+import pf_helper.server as server
 from pf_helper import server as srv
 from pf_helper.config import Config
 from pf_helper.ingest.build import build_index
@@ -50,3 +53,16 @@ def test_search_accepts_category_enum(tmp_path):
     _setup(tmp_path)
     hits = srv.search("status penalty", category=Category.CONDITION, limit=5)
     assert any(h.name == "Frightened" for h in hits)
+
+
+def test_require_index_exits_when_missing(tmp_path, capsys):
+    with pytest.raises(SystemExit) as ei:
+        server._require_index(Config(data_dir=tmp_path))
+    assert ei.value.code == 1
+    assert "setup" in capsys.readouterr().err
+
+
+def test_require_index_passes_when_present(tmp_path):
+    cfg = Config(data_dir=tmp_path)
+    cfg.db_path.write_text("db")
+    server._require_index(cfg)  # no raise

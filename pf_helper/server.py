@@ -7,6 +7,7 @@ The server performs no LLM calls — Claude reasons over what these return.
 from __future__ import annotations
 
 import logging
+import sys
 import threading
 from pathlib import Path
 
@@ -79,8 +80,19 @@ def get_entry(name: str, category: Category | None = None) -> EntryDetail | None
     return r.get(name, category=cat)
 
 
+def _require_index(cfg: Config) -> None:
+    if not Path(cfg.db_path).exists():
+        print(
+            f"No rules index at {cfg.db_path} — run `pf-helper setup` (or `pf-helper ingest`).",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+
 def main() -> None:
-    configure(Config.from_env())
+    cfg = Config.from_env()
+    _require_index(cfg)
+    configure(cfg)
     mcp.run()  # stdio transport by default
 
 

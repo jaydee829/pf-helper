@@ -7,39 +7,31 @@ retrieval — Claude reasons; this server searches.
 
 ## Requirements
 - Python 3.14+
-- [uv](https://docs.astral.sh/uv/)
+- [uv](https://docs.astral.sh/uv/) or [pipx](https://pipx.pypa.io/)
 - git
 - Claude Desktop and/or Claude Code
 
-## Install
-```bash
-uv sync
-```
+## Install & setup (any OS)
 
-## Build the rules index (first run)
-```bash
-uv run pf-helper-ingest
-```
-This clones the FoundryVTT PF2e repo into `data/foundry-pf2e` (large; first
-run takes a few minutes) and builds `data/pf2e.db`. Re-run anytime to update.
+1. Clone, then install the CLI:  `uv tool install .`  (or `pipx install .`)
+2. Run setup:  `pf-helper setup`
+   - builds the rules index (first run, ~a few minutes),
+   - optionally stores your Discord bot token,
+   - registers the MCP server with Claude Desktop and/or Claude Code.
+3. Restart Claude Desktop. Run the bot with `pf-helper bot`.
+
+Manual MCP config (other clients): `pf-helper print-config`.
+Rebuild the index later: `pf-helper ingest --refresh` (quit Claude Desktop and stop the bot first — they hold the index DB open).
 
 ## Register with Claude Desktop
-Add an `mcpServers` entry to `claude_desktop_config.json`. The most robust
-option points directly at the console script created in this project's virtual
-environment by `uv sync` — it needs no `cwd` and does not require `uv` to be on
-Claude Desktop's PATH:
-```json
-{
-  "mcpServers": {
-    "pf-helper": {
-      "command": "C:\\path\\to\\PF_Helper\\.venv\\Scripts\\pf-helper.exe"
-    }
-  }
-}
+`pf-helper setup` handles this automatically. For manual setup, run:
+```bash
+pf-helper register --client desktop
 ```
-Substitute your clone path. On macOS/Linux the script is
-`/path/to/PF_Helper/.venv/bin/pf-helper`. The server locates its `data/pf2e.db`
-index from its own package location, so no working directory is needed.
+Or print the JSON to paste manually:
+```bash
+pf-helper print-config
+```
 
 **Where is the config file?**
 - Windows (.exe installer build): `%APPDATA%\Claude\claude_desktop_config.json`
@@ -66,7 +58,7 @@ subcommand:
   "mcpServers": {
     "pf-helper": {
       "command": "uv",
-      "args": ["--directory", "C:\\path\\to\\PF_Helper", "run", "pf-helper"]
+      "args": ["--directory", "C:\\path\\to\\PF_Helper", "run", "pf-helper", "serve"]
     }
   }
 }
@@ -74,20 +66,20 @@ subcommand:
 
 ## Register with Claude Code
 ```bash
-claude mcp add pf-helper -- uv run pf-helper
+pf-helper register --client claude-code
 ```
-Run this from the project directory (so `uv` resolves this project), or add a
-`.mcp.json` with the same command. Verify with `claude mcp list`.
+Or run it manually: `pf-helper register --client claude-code --print` to print
+the `claude mcp add` command to run yourself. Verify with `claude mcp list`.
 
 ## Verify
 Ask Claude: "Using pf-helper, what does the frightened condition do?" Claude
 should call `search`/`get_entry` and answer from the indexed text.
 
 ## Updating content
-Re-run `uv run pf-helper-ingest` to pull the latest Foundry data and rebuild.
+Re-run `pf-helper ingest --refresh` to pull the latest Foundry data and rebuild.
 
 ## Troubleshooting
-- **"index not found" / empty results:** run `uv run pf-helper-ingest`.
+- **"index not found" / empty results:** run `pf-helper setup` (or `pf-helper ingest`).
 - **`Failed to spawn: pf-helper: program not found` in the MCP log:** the server
   was launched via `uv run` without the project as its working directory. Use
   the direct `.venv\Scripts\pf-helper.exe` command shown above, or
@@ -124,17 +116,21 @@ uv sync --extra bot
 ```
 
 ### Prerequisites
-- Build the index: `uv run pf-helper-ingest`.
+- Build the index: `pf-helper ingest` (or let `pf-helper setup` do it).
 - For `/ask`, authenticate Claude (uses your subscription, not an API key):
   `claude login` on a dev machine, or for a host run `claude setup-token` and
   export the resulting `CLAUDE_CODE_OAUTH_TOKEN`.
 - A Discord bot token: Discord Developer Portal → your application → Bot → Reset
   Token. Invite the bot with OAuth2 scopes `bot` + `applications.commands`.
 
-### Configure (environment variables)
+### Configure
+Run `pf-helper setup` to store your Discord bot token interactively — it saves
+it to the config file so you don't need to set it every session. Alternatively,
+set the `DISCORD_BOT_TOKEN` environment variable directly.
+
 | Var | Required | Purpose |
 |---|---|---|
-| `DISCORD_BOT_TOKEN` | yes | Discord bot auth |
+| `DISCORD_BOT_TOKEN` | yes (or use `pf-helper setup`) | Discord bot auth |
 | `PF_HELPER_DISCORD_GUILD_ID` | no | register slash commands to one guild instantly (else global, ~1h to appear) |
 | `PF_HELPER_DATA_DIR` | no | index location (default: repo `data/`) |
 | `CLAUDE_CODE_OAUTH_TOKEN` | host only | subscription auth without interactive login |
@@ -143,7 +139,7 @@ uv sync --extra bot
 
 ### Run
 ```bash
-uv run pf-helper-bot
+pf-helper bot
 ```
 Then in your server: `/lookup Frightened`, `/search status penalty`,
 `/ask How does flanking work?`. `/lookup` and `/search` never use your Claude
