@@ -19,6 +19,7 @@ from claude_agent_sdk import (
 )
 
 from pf_helper.answer.base import Answer, Answerer
+from pf_helper.answer.tools import get_entry_payload, search_payload
 from pf_helper.retrieval.base import Retriever
 
 _ENTRY_TEXT_CAP = 1500  # keep each entry's text bounded in the RAG prompt
@@ -87,32 +88,13 @@ class AgentMcpAnswerer(Answerer):
         sources: dict[str, str] = {}
 
         async def do_search(args):
-            hits = retriever.search(args["query"], category=args.get("category") or None, limit=8)
-            for h in hits:
-                sources[h.name] = h.source_url
-            payload = [
-                {
-                    "name": h.name,
-                    "category": h.category,
-                    "source_url": h.source_url,
-                    "excerpt": h.excerpt,
-                }
-                for h in hits
-            ]
+            payload = search_payload(retriever, sources, args["query"], args.get("category"))
             return {"content": [{"type": "text", "text": json.dumps(payload)}]}
 
         async def do_get(args):
-            d = retriever.get(args["name"], category=args.get("category") or None)
-            if d is None:
-                return {"content": [{"type": "text", "text": "null"}]}
-            sources[d.name] = d.source_url
-            payload = {
-                "name": d.name,
-                "category": d.category,
-                "source_url": d.source_url,
-                "text": d.text,
-            }
-            return {"content": [{"type": "text", "text": json.dumps(payload)}]}
+            payload = get_entry_payload(retriever, sources, args["name"], args.get("category"))
+            text = json.dumps(payload) if payload is not None else "null"
+            return {"content": [{"type": "text", "text": text}]}
 
         return do_search, do_get, sources
 

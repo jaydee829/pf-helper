@@ -25,6 +25,11 @@ class AnswerError(Exception):
         super().__init__(message or reason)
 
 
+class EngineUnavailable(Exception):
+    """A transient engine failure (e.g. rate limit) — the caller should try the
+    fallback engine. Distinct from AnswerError, which is surfaced to the user."""
+
+
 class Answerer(ABC):
     """Produces an Answer for a question."""
 
