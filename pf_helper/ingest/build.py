@@ -104,9 +104,8 @@ def _ensure_aon_link_cache(cfg: Config, refresh: bool = False) -> None:
         print(f"  link-cached {category:12} {len(docs)}")
 
 
-def main() -> None:
-    cfg = Config.from_env()
-    refresh = "--refresh" in sys.argv[1:]
+def run_ingest(cfg: Config, refresh: bool = False) -> None:
+    """Fetch all content sources and build the SQLite index."""
     print(f"Ensuring Foundry repo at {cfg.foundry_dir} ...")
     _ensure_foundry_repo(cfg)
     print(f"Ensuring AON cache at {cfg.aon_dir} (refresh={refresh}) ...")
@@ -123,6 +122,17 @@ def main() -> None:
     print(f"Indexed {total} entries into {cfg.db_path}")
     for cat in sorted(counts):
         print(f"  {cat:18} {counts[cat]}")
+
+
+def ensure_index(cfg: Config) -> None:
+    """Build the index if it doesn't exist yet (used by setup and the bot)."""
+    if not cfg.db_path.exists():
+        run_ingest(cfg)
+
+
+def main() -> None:
+    refresh = "--refresh" in sys.argv[1:]
+    run_ingest(Config.from_env(), refresh=refresh)
 
 
 if __name__ == "__main__":
