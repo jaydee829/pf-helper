@@ -80,10 +80,13 @@ def _completion_kwargs(cfg: AnswerConfig) -> dict:
     return kw
 
 
-def _call(litellm, lite_exc, **kwargs):
-    """One completion call with provider-error translation."""
+async def _call(litellm, lite_exc, **kwargs):
+    """One async completion call with provider-error translation.
+
+    Uses `acompletion` so the LLM round-trip never blocks the bot's event loop.
+    """
     try:
-        return litellm.completion(**kwargs)
+        return await litellm.acompletion(**kwargs)
     except lite_exc.AuthenticationError as exc:
         raise AnswerError("auth", "Set your /ask provider's API key env var.") from exc
     except (
@@ -118,7 +121,7 @@ class LiteLlmRagAnswerer(Answerer):
             {"role": "system", "content": _SYS_RAG},
             {"role": "user", "content": f"Entries:\n{context}\n\nQuestion: {question}"},
         ]
-        resp = _call(litellm, lite_exc, messages=messages, **kw)
+        resp = await _call(litellm, lite_exc, messages=messages, **kw)
         text = (resp.choices[0].message.content or "").strip()
         return Answer(text=text, sources=[(d.name, d.source_url) for d in details], engine=engine)
 
@@ -151,7 +154,7 @@ class LiteLlmAgentAnswerer(Answerer):
         ]
         text = ""
         for _ in range(self._max_turns):
-            resp = _call(litellm, lite_exc, messages=messages, tools=_TOOLS, **kw)
+            resp = await _call(litellm, lite_exc, messages=messages, tools=_TOOLS, **kw)
             msg = resp.choices[0].message
             tool_calls = getattr(msg, "tool_calls", None) or []
             if not tool_calls:
@@ -159,7 +162,12 @@ class LiteLlmAgentAnswerer(Answerer):
                 break
             messages.append(msg)
             for tc in tool_calls:
-                args = json.loads(tc.function.arguments or "{}")
+                try:  # models occasionally emit malformed tool-call arguments
+                    args = json.loads(tc.function.arguments or "{}")
+                except json.JSONDecodeError:
+                    args = {}
+                if not isinstance(args, dict):
+                    args = {}
                 payload = self._run_tool(tc.function.name, args, sources)
                 messages.append(
                     {"role": "tool", "tool_call_id": tc.id, "name": tc.function.name,

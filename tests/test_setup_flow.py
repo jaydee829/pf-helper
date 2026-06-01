@@ -110,3 +110,15 @@ def test_setup_provider_claude_sdk_writes_provider_only(tmp_path, monkeypatch):
     # bot? n | provider? y | provider="" (default claude-sdk) | desktop? n | cc? n
     sf.run_setup(input_fn=_fake_inputs(["n", "y", "", "n", "n"]))
     assert {"ask": {"provider": "claude-sdk"}} in written
+
+
+def test_setup_reprompts_on_empty_litellm_model(tmp_path, monkeypatch):
+    cfg = Config(data_dir=tmp_path)
+    cfg.db_path.write_text("db")
+    monkeypatch.setattr(sf.Config, "from_env", classmethod(lambda cls: cfg))
+    written = []
+    monkeypatch.setattr(sf.userconfig, "write_file_config", lambda updates: written.append(updates))
+    monkeypatch.setattr(sf, "server_command", lambda: ["pf", "serve"])
+    # the empty model answer ("") triggers a reprompt, then "openai/x" is accepted
+    sf.run_setup(input_fn=_fake_inputs(["n", "y", "litellm", "", "openai/x", "", "n", "n"]))
+    assert {"ask": {"provider": "litellm", "litellm": {"model": "openai/x"}}} in written

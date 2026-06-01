@@ -36,6 +36,12 @@ def _install_fake_litellm(monkeypatch, completion):
     mod = types.ModuleType("litellm")
     mod.completion = completion
 
+    async def fake_acompletion(*args, **kwargs):
+        # dispatch to the current mod.completion so tests can reassign it (e.g. to raise)
+        return mod.completion(*args, **kwargs)
+
+    mod.acompletion = fake_acompletion
+
     class _Exc(Exception):
         pass
 
@@ -159,3 +165,17 @@ async def test_missing_litellm_extra_raises_answererror(monkeypatch):
     with pytest.raises(AnswerError) as ei:
         await LiteLlmRagAnswerer(FakeRetriever([], {}), _cfg()).answer("x")
     assert ei.value.reason == "error" and "litellm" in str(ei.value)
+
+
+@pytest.mark.asyncio
+async def test_agent_tolerates_malformed_tool_args(monkeypatch):
+    from pf_helper.answer.litellm_engines import LiteLlmAgentAnswerer
+
+    hit = SearchHit(id="s:h", name="H", category="spell", excerpt="e", source_url="u")
+    seq = [
+        _msg(tool_calls=[_tool_call("c1", "search", "{not valid json")]),  # malformed args
+        _msg(content="Recovered answer."),
+    ]
+    _install_fake_litellm(monkeypatch, lambda model, messages, **kw: seq.pop(0))
+    ans = await LiteLlmAgentAnswerer(FakeRetriever([hit], {}), _cfg()).answer("x")
+    assert ans.text == "Recovered answer."  # bad JSON -> args={} -> no crash

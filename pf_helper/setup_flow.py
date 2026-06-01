@@ -60,7 +60,11 @@ def run_setup(
         provider = "litellm" if choice == "litellm" else "claude-sdk"
         ask: dict = {"provider": provider}
         if provider == "litellm":
-            model = input_fn("Model (e.g. gemini/gemini-2.5-pro, ollama/llama3.1): ").strip()
+            while True:
+                model = input_fn("Model (e.g. gemini/gemini-2.5-pro, ollama/llama3.1): ").strip()
+                if model:
+                    break
+                print("  Model cannot be empty.")
             litellm: dict = {"model": model}
             api_base = input_fn("API base URL (optional, Enter to skip): ").strip()
             if api_base:
