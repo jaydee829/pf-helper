@@ -3,7 +3,7 @@ import sys
 
 import pytest
 
-from pf_helper.install import desktop
+from pf_helper.install import claude_code, desktop
 from pf_helper.install.server_cmd import server_command
 
 
@@ -73,3 +73,28 @@ def test_register_desktop_creates_when_absent(tmp_path):
     cfg = tmp_path / "sub" / "claude_desktop_config.json"
     desktop.register_desktop(["pf", "serve"], path=cfg)
     assert json.loads(cfg.read_text())["mcpServers"]["pf-helper"]["command"] == "pf"
+
+
+def test_claude_code_argv():
+    assert claude_code.claude_code_argv(["pf", "serve"]) == [
+        "claude", "mcp", "add", "pf-helper", "--", "pf", "serve"
+    ]
+
+
+def test_register_claude_code_runs_when_present():
+    calls = []
+    ok = claude_code.register_claude_code(
+        ["pf", "serve"],
+        which=lambda n: "/usr/bin/claude",
+        run=lambda argv, check: calls.append(argv),
+    )
+    assert ok is True and calls == [["claude", "mcp", "add", "pf-helper", "--", "pf", "serve"]]
+
+
+def test_register_claude_code_skips_when_absent():
+    ok = claude_code.register_claude_code(
+        ["pf", "serve"],
+        which=lambda n: None,
+        run=lambda *a, **k: (_ for _ in ()).throw(AssertionError),
+    )
+    assert ok is False
