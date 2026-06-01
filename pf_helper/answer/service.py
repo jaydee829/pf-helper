@@ -119,6 +119,6 @@ async def ask(
     _log_query("error:quota")
     raise AnswerError(
         "quota",
-        "Claude is unavailable right now (possibly rate-limited) — try `/lookup` "
-        "or `/search`, which work without it.",
+        "The `/ask` LLM is unavailable right now (possibly rate-limited) — try "
+        "`/lookup` or `/search`, which work without it.",
     ) from last_error
