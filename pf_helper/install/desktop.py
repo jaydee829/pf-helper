@@ -44,12 +44,13 @@ def register_desktop(command: list[str], *, path: Path | None = None) -> Path:
             "Claude Desktop isn't available on this OS — use `--client claude-code`."
         )
     if p.exists():
+        raw = p.read_text(encoding="utf-8")
         try:
-            existing = json.loads(p.read_text(encoding="utf-8"))
+            existing = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise RuntimeError(f"{p} is not valid JSON; refusing to overwrite.") from exc
         backup = p.with_suffix(p.suffix + ".bak")
-        backup.write_text(json.dumps(existing, indent=2), encoding="utf-8")
+        backup.write_text(raw, encoding="utf-8")  # verbatim copy preserves original formatting
     else:
         existing = {}
         p.parent.mkdir(parents=True, exist_ok=True)

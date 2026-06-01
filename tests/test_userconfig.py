@@ -44,3 +44,11 @@ def test_write_merges_not_clobbers(tmp_path):
     uc.write_file_config({"discord": {"guild_id": 9}}, path=p)
     cfg = uc.load_file_config(p)
     assert cfg["discord"] == {"token": "t1", "guild_id": 9}
+
+
+def test_dumps_skips_none_values(tmp_path):
+    p = tmp_path / "config.toml"
+    uc.write_file_config({"data_dir": "/d", "discord": {"token": "t", "guild_id": None}}, path=p)
+    cfg = uc.load_file_config(p)
+    assert cfg["discord"] == {"token": "t"}  # guild_id None omitted, not "None"
+    assert "None" not in p.read_text(encoding="utf-8")

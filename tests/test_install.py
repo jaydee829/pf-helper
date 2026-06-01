@@ -11,8 +11,26 @@ def test_server_command_prefers_installed_script():
     assert server_command(which=lambda n: "/usr/bin/pf-helper") == ["/usr/bin/pf-helper", "serve"]
 
 
-def test_server_command_falls_back_to_module():
-    assert server_command(which=lambda n: None) == [sys.executable, "-m", "pf_helper", "serve"]
+def test_server_command_finds_script_next_to_python(tmp_path):
+    # which() misses, but the console script sits beside the interpreter
+    suffix = ".exe" if sys.platform == "win32" else ""
+    exe = tmp_path / "python"
+    exe.write_text("")
+    script = tmp_path / f"pf-helper{suffix}"
+    script.write_text("")
+    assert server_command(which=lambda n: None, executable=str(exe)) == [str(script), "serve"]
+
+
+def test_server_command_falls_back_to_module(tmp_path):
+    # which() misses AND no script beside the interpreter -> python -m fallback
+    fake_exe = tmp_path / "python"
+    fake_exe.write_text("")
+    assert server_command(which=lambda n: None, executable=str(fake_exe)) == [
+        str(fake_exe),
+        "-m",
+        "pf_helper",
+        "serve",
+    ]
 
 
 def test_desktop_path_macos(tmp_path):

@@ -50,3 +50,36 @@ def test_setup_yes_builds_only(tmp_path, monkeypatch):
     monkeypatch.setattr(sf.userconfig, "write_file_config", lambda updates: written.append(updates))
     sf.run_setup(yes=True)
     assert built == [cfg] and written == []
+
+
+def test_setup_reprompts_on_invalid_guild_id(tmp_path, monkeypatch):
+    cfg = Config(data_dir=tmp_path)
+    cfg.db_path.write_text("db")  # index present -> skip build prompt
+    monkeypatch.setattr(sf.Config, "from_env", classmethod(lambda cls: cfg))
+    written = []
+    monkeypatch.setattr(sf.userconfig, "write_file_config", lambda updates: written.append(updates))
+    monkeypatch.setattr(sf, "server_command", lambda: ["pf", "serve"])
+    # configure bot? y | guild "abc" (invalid -> reprompt) | guild "42" | desktop? n | cc? n
+    sf.run_setup(
+        input_fn=_fake_inputs(["y", "abc", "42", "n", "n"]),
+        getpass_fn=lambda prompt="": "tok",
+    )
+    assert written == [{"discord": {"token": "tok", "guild_id": 42}}]
+
+
+def test_setup_claude_code_failure_is_graceful(tmp_path, monkeypatch, capsys):
+    import subprocess
+
+    cfg = Config(data_dir=tmp_path)
+    cfg.db_path.write_text("db")
+    monkeypatch.setattr(sf.Config, "from_env", classmethod(lambda cls: cfg))
+    monkeypatch.setattr(sf, "server_command", lambda: ["pf", "serve"])
+
+    def boom(cmd):
+        raise subprocess.CalledProcessError(1, "claude")
+
+    monkeypatch.setattr(sf.claude_code, "register_claude_code", boom)
+    # configure bot? n | desktop? n | claude-code? y  (should NOT raise)
+    sf.run_setup(input_fn=_fake_inputs(["n", "n", "y"]))
+    out = capsys.readouterr().out
+    assert "Failed to register with Claude Code" in out and "claude mcp add" in out

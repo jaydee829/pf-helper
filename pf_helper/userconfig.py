@@ -63,19 +63,31 @@ def _toml_scalar(v: object) -> str:
 
 
 def _dumps(cfg: dict) -> str:
-    lines = [f"{k} = {_toml_scalar(v)}" for k, v in cfg.items() if not isinstance(v, dict)]
+    # TOML has no null; omit None values (a "None" literal would load back as a string).
+    lines = [
+        f"{k} = {_toml_scalar(v)}"
+        for k, v in cfg.items()
+        if not isinstance(v, dict) and v is not None
+    ]
     for k, v in cfg.items():
         if isinstance(v, dict):
-            lines.append(f"\n[{k}]")
-            lines += [f"{kk} = {_toml_scalar(vv)}" for kk, vv in v.items()]
+            section = [f"{kk} = {_toml_scalar(vv)}" for kk, vv in v.items() if vv is not None]
+            if section:
+                lines.append(f"\n[{k}]")
+                lines += section
     return "\n".join(lines) + "\n"
 
 
 def write_file_config(updates: dict, path: Path | None = None) -> Path:
     p = path or config_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    merged = _deep_merge(load_file_config(p), updates)
-    p.write_text(_dumps(merged), encoding="utf-8")
+    content = _dumps(_deep_merge(load_file_config(p), updates))
     if os.name == "posix":
-        p.chmod(0o600)
+        # Create with 0o600 from the start so the token is never briefly world-readable.
+        fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        p.chmod(0o600)  # also tighten an already-existing file with looser perms
+    else:
+        p.write_text(content, encoding="utf-8")
     return p

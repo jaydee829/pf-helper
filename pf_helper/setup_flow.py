@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import getpass
+import subprocess
 from collections.abc import Callable
 
 from pf_helper import userconfig
@@ -42,9 +43,15 @@ def run_setup(
     if _yn(input_fn, "Configure the Discord bot?", default=False):
         token = getpass_fn("Discord bot token: ").strip()
         disc: dict = {"token": token}
-        gid = input_fn("Guild ID (optional, Enter to skip): ").strip()
-        if gid:
-            disc["guild_id"] = int(gid)
+        while True:
+            gid = input_fn("Guild ID (optional, Enter to skip): ").strip()
+            if not gid:
+                break
+            try:
+                disc["guild_id"] = int(gid)
+                break
+            except ValueError:
+                print("  Invalid Guild ID — enter a number, or press Enter to skip.")
         userconfig.write_file_config({"discord": disc})
         print("Saved Discord config.")
 
@@ -53,12 +60,17 @@ def run_setup(
         try:
             path = desktop.register_desktop(cmd)
             print(f"  Registered with Claude Desktop at {path}. Restart Desktop.")
-        except RuntimeError as exc:
+        except (RuntimeError, OSError) as exc:
             print(f"  Skipped Desktop: {exc}")
     if _yn(input_fn, "Register the MCP server with Claude Code?", default=False):
-        if claude_code.register_claude_code(cmd):
-            print("  Registered with Claude Code.")
-        else:
-            print("  `claude` not found — run: " + " ".join(claude_code.claude_code_argv(cmd)))
+        manual_cmd = " ".join(claude_code.claude_code_argv(cmd))
+        try:
+            if claude_code.register_claude_code(cmd):
+                print("  Registered with Claude Code.")
+            else:
+                print(f"  `claude` not found — run:\n    {manual_cmd}")
+        except (subprocess.CalledProcessError, OSError) as exc:
+            print(f"  Failed to register with Claude Code: {exc}")
+            print(f"  You can run this manually:\n    {manual_cmd}")
 
     print("Setup complete.")
