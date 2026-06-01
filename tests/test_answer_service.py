@@ -203,3 +203,31 @@ def test_answer_config_provider_from_file(monkeypatch):
     assert cfg.provider == "litellm"
     assert cfg.litellm_model == "ollama/llama3.1"
     assert cfg.litellm_api_base == "http://x/v1"
+
+
+def test_build_engines_claude_sdk():
+    from pf_helper.answer import service
+    from pf_helper.answer.engines import AgentMcpAnswerer, ContextRagAnswerer
+
+    a, b = service._build_engines(AnswerConfig(provider="claude-sdk"), retriever=object())
+    assert isinstance(a, AgentMcpAnswerer) and isinstance(b, ContextRagAnswerer)
+
+
+def test_build_engines_litellm():
+    from pf_helper.answer import service
+    from pf_helper.answer.litellm_engines import LiteLlmAgentAnswerer, LiteLlmRagAnswerer
+
+    a, b = service._build_engines(
+        AnswerConfig(provider="litellm", litellm_model="openai/x"), retriever=object()
+    )
+    assert isinstance(a, LiteLlmAgentAnswerer) and isinstance(b, LiteLlmRagAnswerer)
+
+
+@pytest.mark.asyncio
+async def test_engine_unavailable_triggers_fallback():
+    from pf_helper.answer.base import EngineUnavailable
+
+    a = FakeEngine(exc=EngineUnavailable("rate limited"))
+    b = FakeEngine(Answer("B-ans", [("n", "u")], "litellm:x"))
+    out = await ask("q", cache=FakeCache(), engine_a=a, engine_b=b)
+    assert out.text == "B-ans" and a.calls == 1 and b.calls == 1

@@ -6,12 +6,23 @@ import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from pf_helper.answer.base import Answer, Answerer, AnswerError
+from pf_helper.answer.base import Answer, Answerer, AnswerError, EngineUnavailable
 from pf_helper.answer.cache import AnswerCache, index_version
 from pf_helper.answer.config import AnswerConfig
 from pf_helper.answer.querylog import log_query
 
 _log = logging.getLogger(__name__)
+
+
+def _build_engines(cfg: AnswerConfig, retriever) -> tuple[Answerer, Answerer]:
+    """Return (primary, fallback) answerers for the configured provider."""
+    if cfg.provider == "litellm":
+        from pf_helper.answer.litellm_engines import LiteLlmAgentAnswerer, LiteLlmRagAnswerer
+
+        return LiteLlmAgentAnswerer(retriever, cfg), LiteLlmRagAnswerer(retriever, cfg)
+    from pf_helper.answer.engines import AgentMcpAnswerer, ContextRagAnswerer
+
+    return AgentMcpAnswerer(retriever), ContextRagAnswerer(retriever)
 
 
 async def ask(
@@ -39,12 +50,12 @@ async def ask(
     from claude_agent_sdk import ClaudeSDKError, CLINotFoundError
 
     if engine_a is None or engine_b is None:
-        from pf_helper.answer.engines import AgentMcpAnswerer, ContextRagAnswerer
         from pf_helper.retrieval.factory import build_retriever
 
         retriever = retriever or build_retriever(cfg.core)
-        engine_a = engine_a or AgentMcpAnswerer(retriever)
-        engine_b = engine_b or ContextRagAnswerer(retriever)
+        built_a, built_b = _build_engines(cfg, retriever)
+        engine_a = engine_a or built_a
+        engine_b = engine_b or built_b
 
     if cache is None and cfg.cache_enabled:
         cache = AnswerCache(
@@ -98,7 +109,10 @@ async def ask(
                 "`/ask` needs Claude sign-in: run `claude setup-token` and set "
                 "`CLAUDE_CODE_OAUTH_TOKEN` (or `claude login`).",
             ) from exc
-        except ClaudeSDKError as exc:
+        except AnswerError as exc:  # e.g. litellm auth / missing-extra — surface as-is
+            _log_query(f"error:{exc.reason}")
+            raise
+        except (ClaudeSDKError, EngineUnavailable) as exc:
             last_error = exc
             _log.warning("%s failed: %s", type(engine).__name__, exc)
             continue
