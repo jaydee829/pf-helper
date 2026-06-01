@@ -13,6 +13,7 @@ from pf_helper.answer import AnswerError, ask
 from pf_helper.answer.config import AnswerConfig
 from pf_helper.bot.config import BotConfig
 from pf_helper.bot.embeds import answer_embed, lookup_embed, lookup_miss_embed, search_embeds
+from pf_helper.ingest.build import ensure_index
 from pf_helper.models import Category
 from pf_helper.retrieval.factory import build_retriever
 
@@ -112,6 +113,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     bot_cfg = BotConfig.from_env()
     answer_cfg = AnswerConfig.from_env()
+    ensure_index(answer_cfg.core)
     bot = build_bot(bot_cfg, answer_cfg)
     bot.run(bot_cfg.token)
 
