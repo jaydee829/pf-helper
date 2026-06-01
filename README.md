@@ -79,7 +79,7 @@ should call `search`/`get_entry` and answer from the indexed text.
 Re-run `pf-helper ingest --refresh` to pull the latest Foundry data and rebuild.
 
 ## Troubleshooting
-- **"index not found" / empty results:** run `uv run pf-helper-ingest`.
+- **"index not found" / empty results:** run `pf-helper setup` (or `pf-helper ingest`).
 - **`Failed to spawn: pf-helper: program not found` in the MCP log:** the server
   was launched via `uv run` without the project as its working directory. Use
   the direct `.venv\Scripts\pf-helper.exe` command shown above, or
