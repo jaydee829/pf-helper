@@ -135,3 +135,27 @@ async def test_missing_model_raises(monkeypatch):
     _install_fake_litellm(monkeypatch, lambda **k: _msg(content="x"))
     with pytest.raises(AnswerError):
         await LiteLlmRagAnswerer(FakeRetriever([], {}), _cfg(model="")).answer("x")
+
+
+@pytest.mark.asyncio
+async def test_agent_loop_exhaustion_raises_engine_unavailable(monkeypatch):
+    from pf_helper.answer.litellm_engines import LiteLlmAgentAnswerer
+
+    hit = SearchHit(id="s:h", name="H", category="spell", excerpt="e", source_url="u")
+
+    def always_tools(model, messages, **kw):
+        return _msg(tool_calls=[_tool_call("c", "search", '{"query": "x"}')])
+
+    _install_fake_litellm(monkeypatch, always_tools)
+    with pytest.raises(EngineUnavailable):
+        await LiteLlmAgentAnswerer(FakeRetriever([hit], {}), _cfg(), max_turns=2).answer("x")
+
+
+@pytest.mark.asyncio
+async def test_missing_litellm_extra_raises_answererror(monkeypatch):
+    from pf_helper.answer.litellm_engines import LiteLlmRagAnswerer
+
+    monkeypatch.setitem(sys.modules, "litellm", None)  # force ImportError on `import litellm`
+    with pytest.raises(AnswerError) as ei:
+        await LiteLlmRagAnswerer(FakeRetriever([], {}), _cfg()).answer("x")
+    assert ei.value.reason == "error" and "litellm" in str(ei.value)

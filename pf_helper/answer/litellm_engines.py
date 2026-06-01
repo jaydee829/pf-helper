@@ -64,7 +64,7 @@ def _load_litellm():
     try:
         import litellm
         from litellm import exceptions as lite_exc
-    except ModuleNotFoundError as exc:
+    except ImportError as exc:  # ModuleNotFoundError or a partial/corrupt install
         raise AnswerError(
             "error", "provider=litellm needs the extra: `uv sync --extra litellm`."
         ) from exc
@@ -165,4 +165,8 @@ class LiteLlmAgentAnswerer(Answerer):
                     {"role": "tool", "tool_call_id": tc.id, "name": tc.function.name,
                      "content": json.dumps(payload)}
                 )
+        if not text:
+            # Exhausted max_turns still calling tools, or an empty final answer —
+            # treat as a transient miss so the service falls back to the RAG engine.
+            raise EngineUnavailable("LiteLLM agent produced no answer (tool-loop exhausted).")
         return Answer(text=text, sources=list(sources.items()), engine=engine)
