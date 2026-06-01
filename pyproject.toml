@@ -23,6 +23,7 @@ bot = [
     "claude-agent-sdk>=0.2.87",
     "discord-py>=2.7.1",
 ]
+litellm = ["litellm>=1.0"]
 
 [build-system]
 requires = ["hatchling"]

@@ -115,6 +115,24 @@ Archives of Nethys links; frequently-asked questions are cached.
 uv sync --extra bot
 ```
 
+### Choosing the /ask LLM provider
+
+`/ask` defaults to your Claude subscription via the Claude Agent SDK. To use a
+different provider, set `provider = "litellm"` (run `pf-helper setup` or edit
+`config.toml`) and install the extra: `uv sync --extra bot --extra litellm`.
+
+```toml
+[ask]
+provider = "litellm"
+[ask.litellm]
+model = "gemini/gemini-2.5-pro"   # or openai/gpt-4o, ollama/llama3.1, ...
+# api_base = "http://localhost:11434/v1"   # local (Ollama/LM Studio)
+```
+
+Provider API keys come from that provider's standard env var
+(`OPENAI_API_KEY`, `GEMINI_API_KEY`, ...) — PF_Helper never stores them. Local
+models (Ollama) need no key.
+
 ### Prerequisites
 - Build the index: `pf-helper ingest` (or let `pf-helper setup` do it).
 - For `/ask`, authenticate Claude (uses your subscription, not an API key):
