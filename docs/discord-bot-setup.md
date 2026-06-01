@@ -58,11 +58,16 @@ Open **PowerShell** in the project folder (`C:\Users\jayde\Documents\PF_Helper`)
    uv sync --extra bot
    ```
 
-2. **Make sure the rules index is built** (you already did this; re-run only to
-   refresh):
+2. **Run first-time setup** — this builds the rules index, stores your bot
+   token in the config file, and optionally registers the MCP server:
    ```powershell
-   uv run pf-helper-ingest
+   pf-helper setup
    ```
+   When prompted for the Discord bot token, paste the token you copied in Part 1.
+   When prompted for your guild/server ID, paste the number from Part 3.
+   The token is saved to the config file — you won't need to re-enter it each
+   session. (Alternatively, skip this and set `DISCORD_BOT_TOKEN` as an
+   environment variable in your shell session instead.)
 
 3. **Sign in to Claude** (needed only for `/ask` — it uses your Claude
    subscription, no API key). You're likely already signed in via Claude Code;
@@ -70,28 +75,21 @@ Open **PowerShell** in the project folder (`C:\Users\jayde\Documents\PF_Helper`)
    ```powershell
    claude setup-token
    ```
-   and copy the token it prints into the `CLAUDE_CODE_OAUTH_TOKEN` variable in
-   the next step. On this machine `claude login` is usually enough and no token
-   is needed.
-
-4. **Set the environment variables** (this PowerShell session only — paste your
-   real values):
+   and export the resulting token:
    ```powershell
-   $env:DISCORD_BOT_TOKEN = "paste-your-bot-token-here"
-   $env:PF_HELPER_DISCORD_GUILD_ID = "paste-your-server-id-here"
-   # Only if step 3 told you to:
-   # $env:CLAUDE_CODE_OAUTH_TOKEN = "paste-the-setup-token-here"
+   $env:CLAUDE_CODE_OAUTH_TOKEN = "paste-the-setup-token-here"
    ```
+   On this machine `claude login` is usually enough and no token is needed.
 
-5. **Run the bot:**
+4. **Run the bot:**
    ```powershell
-   uv run pf-helper-bot
+   pf-helper bot
    ```
    You should see a log line like `Logged in as PF Helper#1234`. The bot is now
    **online** in your server. Leave this window open while you test.
    - If you see a *"file is being used by another process"* error, Claude
      Desktop's background server is holding the shared executable — either fully
-     quit Claude Desktop, or run `uv run --no-sync pf-helper-bot` instead.
+     quit Claude Desktop, or run `uv run --no-sync pf-helper bot` instead.
 
 To stop the bot, press **Ctrl+C** in that PowerShell window.
 
@@ -123,23 +121,26 @@ If all of those behave as described, the bot is verified. 🎉
 
 ## Troubleshooting
 
-- **Slash commands don't appear:** make sure you set `PF_HELPER_DISCORD_GUILD_ID`
-  (Part 3) before running; without it they're global and take up to an hour. Try
-  re-running the bot, and refresh Discord (Ctrl+R).
-- **Bot shows offline:** the `uv run pf-helper-bot` window must stay open; check
-  it for an error. Re-check the bot token.
+- **Slash commands don't appear:** make sure you provided your guild/server ID
+  during `pf-helper setup` (or set `PF_HELPER_DISCORD_GUILD_ID` before running);
+  without it they're global and take up to an hour. Try re-running the bot, and
+  refresh Discord (Ctrl+R).
+- **Bot shows offline:** the `pf-helper bot` window must stay open; check it for
+  an error. Re-check the bot token (re-run `pf-helper setup` if needed).
 - **`/ask` says it needs sign-in:** run `claude setup-token` and set
-  `CLAUDE_CODE_OAUTH_TOKEN` (Part 3/4). `/lookup` and `/search` work regardless.
-- **"Rules index not found":** run `uv run pf-helper-ingest`.
+  `CLAUDE_CODE_OAUTH_TOKEN` (Part 4, step 3). `/lookup` and `/search` work
+  regardless.
+- **"Rules index not found":** run `pf-helper ingest`.
 - **The bot token leaked** (committed, shared, etc.): go back to the Developer
-  Portal → Bot → **Reset Token** to invalidate the old one, and update your env
-  variable.
+  Portal → Bot → **Reset Token** to invalidate the old one, then re-run
+  `pf-helper setup` to store the new token.
 
 ## Running it long-term
 
 The steps above run the bot only while the PowerShell window is open and only
 in that session. To keep it always online, run it on an always-on machine (a
-small VPS or a Raspberry Pi): copy the repo there, build the index, set
-`DISCORD_BOT_TOKEN` and `CLAUDE_CODE_OAUTH_TOKEN` as persistent environment
-variables, and run `pf-helper-bot` under a process manager. Same commands — only
-the host differs.
+small VPS or a Raspberry Pi): copy the repo there, run `pf-helper setup` to
+build the index and store the token, set `DISCORD_BOT_TOKEN` and
+`CLAUDE_CODE_OAUTH_TOKEN` as persistent environment variables (or rely on the
+config file written by setup), and run `pf-helper bot` under a process manager.
+Same commands — only the host differs.

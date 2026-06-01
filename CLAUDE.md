@@ -4,7 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-This is a **greenfield project** — no code, build system, or tests exist yet. The only content is `background/Inspiration.md`, a design discussion. When you scaffold the project, update this file with real build/lint/test commands.
+The project is implemented and functional. Key commands:
+
+- **Run the MCP server:** `pf-helper serve` (or bare `pf-helper` — back-compat)
+- **Run the Discord bot:** `pf-helper bot`
+- **Build / refresh the rules index:** `pf-helper ingest [--refresh]`
+- **First-time interactive setup:** `pf-helper setup`
+- **Register with a client:** `pf-helper register --client desktop|claude-code`
+- **Print MCP config:** `pf-helper print-config`
+- **Run tests:** `uv run pytest` (or `uv run --no-sync pytest`)
+- **Lint:** `uv run ruff check .` / `uv run ruff format .`
+- **Sync deps (dev):** `uv sync` (Desktop must be closed — it holds the venv exe)
 
 ## What this project is
 

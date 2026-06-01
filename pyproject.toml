@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pf-helper = "pf_helper.server:main"
+pf-helper = "pf_helper.cli:main"
 pf-helper-ingest = "pf_helper.ingest.build:main"
 pf-helper-bot = "pf_helper.bot.main:main"
 
