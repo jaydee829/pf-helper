@@ -55,6 +55,25 @@ def run_setup(
         userconfig.write_file_config({"discord": disc})
         print("Saved Discord config.")
 
+    if _yn(input_fn, "Configure the /ask LLM provider?", default=False):
+        choice = input_fn("Provider [claude-sdk/litellm] (default claude-sdk): ").strip().lower()
+        provider = "litellm" if choice == "litellm" else "claude-sdk"
+        ask: dict = {"provider": provider}
+        if provider == "litellm":
+            while True:
+                model = input_fn("Model (e.g. gemini/gemini-2.5-pro, ollama/llama3.1): ").strip()
+                if model:
+                    break
+                print("  Model cannot be empty.")
+            litellm: dict = {"model": model}
+            api_base = input_fn("API base URL (optional, Enter to skip): ").strip()
+            if api_base:
+                litellm["api_base"] = api_base
+            ask["litellm"] = litellm
+            print("  Set the provider's API key env var (e.g. OPENAI_API_KEY / GEMINI_API_KEY).")
+        userconfig.write_file_config({"ask": ask})
+        print("Saved /ask provider config.")
+
     cmd = server_command()
     if _yn(input_fn, "Register the MCP server with Claude Desktop?", default=True):
         try:

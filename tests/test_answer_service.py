@@ -1,6 +1,7 @@
 import pytest
 from claude_agent_sdk import ClaudeSDKError, CLINotFoundError
 
+import pf_helper.answer.config as cfgmod
 from pf_helper.answer import Answer, AnswerConfig, AnswerError
 from pf_helper.answer.service import ask
 
@@ -168,3 +169,65 @@ async def test_engine_fallback_logs_once_not_per_engine():
     out = await ask("q", cache=FakeCache(), engine_a=a, engine_b=b, query_logger=recs.append)
     assert out.text == "B-ans"
     assert len(recs) == 1 and recs[0]["served_by"] == "rag"
+
+
+def test_answer_config_provider_default(monkeypatch):
+    monkeypatch.delenv("PF_HELPER_ASK_PROVIDER", raising=False)
+    monkeypatch.setattr(cfgmod.userconfig, "load_file_config", dict)
+    cfg = cfgmod.AnswerConfig.from_env()
+    assert cfg.provider == "claude-sdk"
+    assert cfg.litellm_model == "" and cfg.litellm_api_base is None
+
+
+def test_answer_config_provider_env_wins(monkeypatch):
+    monkeypatch.setenv("PF_HELPER_ASK_PROVIDER", "LiteLLM")
+    monkeypatch.setenv("PF_HELPER_ASK_LITELLM_MODEL", "openai/gpt-4o")
+    monkeypatch.setattr(
+        cfgmod.userconfig, "load_file_config",
+        lambda: {"ask": {"provider": "claude-sdk", "litellm": {"model": "x"}}},
+    )
+    cfg = cfgmod.AnswerConfig.from_env()
+    assert cfg.provider == "litellm"  # lower-cased, env wins
+    assert cfg.litellm_model == "openai/gpt-4o"
+
+
+def test_answer_config_provider_from_file(monkeypatch):
+    monkeypatch.delenv("PF_HELPER_ASK_PROVIDER", raising=False)
+    monkeypatch.delenv("PF_HELPER_ASK_LITELLM_MODEL", raising=False)
+    monkeypatch.delenv("PF_HELPER_ASK_LITELLM_API_BASE", raising=False)
+    monkeypatch.setattr(
+        cfgmod.userconfig, "load_file_config",
+        lambda: {"ask": {"provider": "litellm", "litellm": {"model": "ollama/llama3.1", "api_base": "http://x/v1"}}},
+    )
+    cfg = cfgmod.AnswerConfig.from_env()
+    assert cfg.provider == "litellm"
+    assert cfg.litellm_model == "ollama/llama3.1"
+    assert cfg.litellm_api_base == "http://x/v1"
+
+
+def test_build_engines_claude_sdk():
+    from pf_helper.answer import service
+    from pf_helper.answer.engines import AgentMcpAnswerer, ContextRagAnswerer
+
+    a, b = service._build_engines(AnswerConfig(provider="claude-sdk"), retriever=object())
+    assert isinstance(a, AgentMcpAnswerer) and isinstance(b, ContextRagAnswerer)
+
+
+def test_build_engines_litellm():
+    from pf_helper.answer import service
+    from pf_helper.answer.litellm_engines import LiteLlmAgentAnswerer, LiteLlmRagAnswerer
+
+    a, b = service._build_engines(
+        AnswerConfig(provider="litellm", litellm_model="openai/x"), retriever=object()
+    )
+    assert isinstance(a, LiteLlmAgentAnswerer) and isinstance(b, LiteLlmRagAnswerer)
+
+
+@pytest.mark.asyncio
+async def test_engine_unavailable_triggers_fallback():
+    from pf_helper.answer.base import EngineUnavailable
+
+    a = FakeEngine(exc=EngineUnavailable("rate limited"))
+    b = FakeEngine(Answer("B-ans", [("n", "u")], "litellm:x"))
+    out = await ask("q", cache=FakeCache(), engine_a=a, engine_b=b)
+    assert out.text == "B-ans" and a.calls == 1 and b.calls == 1

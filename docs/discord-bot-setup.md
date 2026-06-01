@@ -69,6 +69,16 @@ Open **PowerShell** in the project folder (`C:\Users\jayde\Documents\PF_Helper`)
    session. (Alternatively, skip this and set `DISCORD_BOT_TOKEN` as an
    environment variable in your shell session instead.)
 
+   `pf-helper setup` also offers to configure the `/ask` LLM provider. The
+   default is the Claude Agent SDK (your Claude subscription — no API key). If
+   you choose `litellm`, you must also install the extra and supply the
+   provider's API key env var:
+   ```powershell
+   uv sync --extra bot --extra litellm
+   $env:OPENAI_API_KEY = "sk-..."   # or GEMINI_API_KEY, etc.
+   ```
+   Local models via Ollama work without any API key.
+
 3. **Sign in to Claude** (needed only for `/ask` — it uses your Claude
    subscription, no API key). You're likely already signed in via Claude Code;
    if `/ask` later says it needs sign-in, run:
