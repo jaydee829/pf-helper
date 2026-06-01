@@ -49,16 +49,16 @@ reads `[discord]`):
 | `provider` | `PF_HELPER_ASK_PROVIDER` | `[ask] provider` | `"claude-sdk"` |
 | `litellm_model` | `PF_HELPER_ASK_LITELLM_MODEL` | `[ask.litellm] model` | `""` |
 | `litellm_api_base` | `PF_HELPER_ASK_LITELLM_API_BASE` | `[ask.litellm] api_base` | `None` |
-| `litellm_api_key` | `PF_HELPER_ASK_LITELLM_API_KEY` | `[ask.litellm] api_key` | `None` |
 
 `provider` is one of `"claude-sdk"` | `"litellm"`. `litellm_model` uses LiteLLM's
 `provider/model` convention (e.g. `gemini/gemini-2.5-pro`, `openai/gpt-4o`,
 `ollama/llama3.1`). `api_base` is for local/self-hosted endpoints (e.g. Ollama).
-`api_key` is **optional** — if unset, LiteLLM reads the provider's standard env
-var (`OPENAI_API_KEY`, `GEMINI_API_KEY`, …); if set (e.g. via `setup`), it's
-passed explicitly to LiteLLM. The config file is the existing user `config.toml`
-(written `0o600`), so a stored key sits with the same protection as the Discord
-token. `from_env` loads `userconfig.load_file_config().get("ask", {})`.
+
+**Provider API keys are environment-only** — PF_Helper never stores them in
+config. LiteLLM reads the provider's standard env var (`OPENAI_API_KEY`,
+`GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, …) from the process environment; there is
+no `api_key` config field and `setup` does not prompt for one. `from_env` loads
+`userconfig.load_file_config().get("ask", {})`.
 
 `config.toml` example:
 
@@ -69,7 +69,7 @@ provider = "litellm"
 [ask.litellm]
 model = "gemini/gemini-2.5-pro"
 # api_base = "http://localhost:11434/v1"   # e.g. Ollama
-# api_key  = "..."                          # else read from the provider's env var
+# (the provider API key comes from its standard env var, e.g. GEMINI_API_KEY)
 ```
 
 ---
@@ -138,8 +138,9 @@ text + the retrieved entries' AON sources.
   otherwise the assistant text is the final answer.
 - return `Answer(text, sources=list(sources.items()), engine=f"litellm:{model}")`.
 
-Both pass `api_base`/`api_key` to `litellm.completion` only when set in cfg
-(otherwise LiteLLM uses its env-var conventions).
+Both pass `api_base` to `litellm.completion` only when set in cfg. Provider API
+keys are **not** passed from config — LiteLLM reads them from the standard
+provider env vars.
 
 ### Error translation
 
@@ -162,14 +163,14 @@ Configure the /ask LLM provider? [y/N]
      if litellm:
         Model (e.g. gemini/gemini-2.5-pro, openai/gpt-4o, ollama/llama3.1):
         API base URL (optional, Enter to skip):
-        API key (optional, Enter to use the provider's env var):  [getpass, no echo]
-     write_file_config({"ask": {"provider": ..., "litellm": {model, api_base?, api_key?}}})
+        (reminder printed: set the provider's API key env var, e.g. GEMINI_API_KEY)
+     write_file_config({"ask": {"provider": ..., "litellm": {model, api_base?}}})
 ```
 
-Keys collected via `getpass` (never echoed); written to the `0o600` config file.
-Empty optional answers are omitted (the existing `_dumps` skips `None`). Factored
-into testable pure helpers behind the `input_fn`/`getpass_fn` injection that
-`run_setup` already uses. `--yes` skips this prompt (like the others).
+`setup` does **not** prompt for or store a provider API key — it prints a
+reminder to set the relevant env var. Empty optional answers are omitted (the
+existing `_dumps` skips `None`). Factored into testable pure helpers behind the
+`input_fn` injection `run_setup` already uses. `--yes` skips this prompt.
 
 ---
 
@@ -212,7 +213,7 @@ docs/...                   # MODIFY: provider config + examples (Ollama/OpenAI/G
 - Missing `litellm` extra while `provider="litellm"` → the lazy import raises
   `ModuleNotFoundError`; catch it at engine construction and surface a clear
   `AnswerError`/log message: "provider=litellm needs `uv sync --extra litellm`."
-- A stored `api_key` is never logged; lives only in the `0o600` config file.
+- Provider API keys are env-only and never written to config or logs.
 
 ## Testing
 
